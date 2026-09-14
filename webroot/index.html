@@ -1,0 +1,3005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tailscale Native</title>
+  <style>
+    :root {
+      --bg: #121316;
+      --card-bg: #1c1d22;
+      --card-border: #2a2c35;
+      --text: #f0f2f5;
+      --text-muted: #8b909f;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 14px; font-size: 14px; line-height: 1.5; padding-bottom: 30px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); }
+    .title-group h1 { font-size: 18px; font-weight: 700; color: #fff; }
+    .title-group .sub { font-size: 11px; color: var(--text-muted); }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge.green { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .badge.yellow { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
+    .badge.red { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--text-muted); font-size: 13px; }
+    .info-val { font-weight: 500; font-family: ui-monospace, monospace; color: #fff; font-size: 13px; }
+    .copyable { cursor: pointer; transition: all 0.15s; }
+    .copyable:hover { opacity: 0.85; filter: brightness(1.2); text-decoration: underline dotted rgba(147, 197, 253, 0.4); }
+    .copyable:active { transform: scale(0.98); }
+    .link-clean { color: #60a5fa; cursor: pointer; text-decoration: none; transition: all 0.15s; }
+    .link-clean:hover, .link-clean:active, .link-clean:focus { text-decoration: underline; color: #93c5fd; }
+    .link-danger { color: #ef4444; cursor: pointer; text-decoration: none; transition: all 0.15s; }
+    .link-danger:hover, .link-danger:active, .link-danger:focus { text-decoration: underline; color: #f87171; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    button { border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: #fff; background: #2d303a; box-sizing: border-box; }
+    button:active { transform: scale(0.97); }
+    .btn-group button { flex: 1; min-width: 85px; padding: 9px 12px; border-radius: 10px; }
+    button.primary { background: var(--accent); }
+    button.primary:hover { background: var(--accent-hover); }
+    button.danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+    button.success { background: rgba(16, 185, 129, 0.2); color: var(--green); }
+    input[type="text"], select { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--card-border); background: #121316; color: #fff; font-size: 13px; outline: none; margin-bottom: 10px; box-sizing: border-box; }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); }
+    
+    /* Custom Exit Node Dropdown (彻底解决 Android WebView 原生 select 弹窗跳动置顶 Bug) */
+    .custom-select-wrapper { position: relative; margin-bottom: 10px; }
+    .custom-select-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--card-border); background: #121316; color: #fff; font-size: 13px; cursor: pointer; user-select: none; transition: border-color 0.2s, background 0.2s; }
+    .custom-select-trigger:active { background: #1a1c22; border-color: #3b82f6; }
+    .custom-select-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.2s ease; }
+    .custom-select-arrow.open { transform: rotate(180deg); }
+    .custom-select-options { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #161820; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 100; max-height: 240px; overflow-y: auto; padding: 6px; }
+    .custom-option-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: background 0.15s; margin-bottom: 2px; }
+    .custom-option-item:hover, .custom-option-item:active { background: rgba(59, 130, 246, 0.15); }
+    .custom-option-item.active { background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.5); }
+    .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
+    .switch-info { flex: 1; padding-right: 12px; }
+    .switch-title { font-weight: 500; font-size: 13px; color: #fff; }
+    .switch-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .toggle { position: relative; width: 44px; height: 24px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #373b49; transition: .3s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .tip { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+    #toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.92);
+      background: rgba(18, 20, 26, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      z-index: 999999;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+      max-width: 85vw;
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* 通用设置项与列表条目规范 (统一对齐局域网设备列表 Peer List 的精致卡片设计) */
+    .setting-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .setting-item:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Peer List Styles */
+    .peer-item { background: #16171d; border: 1px solid var(--card-border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; contain: content; transform: translateZ(0); }
+    .peer-item:last-child { margin-bottom: 0; }
+    .peer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .peer-name-grp { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.offline { background: var(--text-muted); }
+    .peer-name { font-weight: 700; color: #fff; font-size: 14px; }
+    .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+    .tag.os { background: #262934; color: #94a3b8; text-transform: uppercase; }
+    .tag.exit { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .tag.active-exit { background: rgba(16, 185, 129, 0.25); color: #34d399; font-weight: 700; }
+    .peer-conn { font-size: 11px; color: var(--text-muted); }
+
+    /* IP Chips - 大面积触控与防误触卡片 */
+    .peer-ips { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 6px; }
+    .ip-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ip-chip:active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: scale(0.99);
+    }
+    .ip-chip-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .ip-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 3px 7px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      line-height: 1;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+    .ip-tag.v4 { background: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+    .ip-tag.v6 { background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+    .ip-val-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: #f1f5f9;
+      word-break: break-all;
+      line-height: 1.4;
+      user-select: all;
+    }
+    .ip-chip.v6 .ip-val-text { font-size: 12px; color: #ddd6fe; }
+    .ip-copy-hint {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      padding-left: 8px;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .ip-chip:hover .ip-copy-hint { color: #93c5fd; }
+
+    /* 现代化科技感胶囊标签体系 (对齐 IPV6 原生标签，彻底取代 Emoji 图标) */
+    .tech-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      border-radius: 6px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      user-select: none;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      padding: 3px 7px;
+    }
+    .tech-badge.leading {
+      width: 68px;
+      min-width: 68px;
+      max-width: 68px;
+      height: 24px;
+      padding: 0 4px;
+      flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .card-title-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 24px;
+    }
+    .card-title-icon {
+      font-size: 16px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .card-title-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f1f5f9;
+      line-height: 1;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .tech-badge.purple {
+      background: rgba(168, 85, 247, 0.18);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.35);
+    }
+    .tech-badge.blue {
+      background: rgba(59, 130, 246, 0.18);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+    }
+    .tech-badge.green {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .tech-badge.cyan {
+      background: rgba(6, 182, 212, 0.18);
+      color: #38bdf8;
+      border: 1px solid rgba(6, 182, 212, 0.35);
+    }
+    .tech-badge.amber {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+    .tech-badge.red {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .tech-badge.gray {
+      background: rgba(148, 163, 184, 0.14);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .tag-sub {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .section-title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 14px 0 6px 0;
+    }
+    .code-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .code-chip.cyan {
+      background: rgba(56, 189, 248, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .code-chip.emerald {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .code-chip.purple {
+      background: rgba(168, 85, 247, 0.12);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.25);
+    }
+    .code-chip.amber {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    .code-chip.blue {
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    /* Peer Bottom Bar & Buttons */
+    .peer-bottom-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .peer-actions-right {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+    /* 全局小操作按钮统一规范 (对齐局域网设备列表 Peer List 的精致微交互风格) */
+    .btn-action, .btn-xs, .btn-log {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 25px;
+      line-height: 19px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 6px;
+      min-width: auto;
+      flex: 0 0 auto;
+      box-sizing: border-box;
+      margin: 0;
+      border: 1px solid var(--card-border);
+      background: #262934;
+      color: #cbd5e1;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .btn-action:active, .btn-xs:active, .btn-log:active { transform: scale(0.96); }
+    .btn-action.default, .btn-xs.default, .btn-log.default {
+      background: #262934;
+      color: #cbd5e1;
+      border: 1px solid var(--card-border);
+    }
+    .btn-action.default:hover, .btn-xs.default:hover, .btn-log.default:hover { background: #323644; color: #fff; }
+    .btn-action.default:active, .btn-xs.default:active, .btn-log.default:active { background: #1e212b; }
+    .btn-action.primary, .btn-xs.primary, .btn-log.primary {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+    }
+    .btn-action.primary:hover, .btn-xs.primary:hover, .btn-log.primary:hover { background: rgba(59, 130, 246, 0.25); color: #93c5fd; }
+    .btn-action.primary:active, .btn-xs.primary:active, .btn-log.primary:active { background: #2563eb; color: #fff; }
+    .btn-action.danger, .btn-xs.danger, .btn-log.danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .btn-action.danger:hover, .btn-xs.danger:hover, .btn-log.danger:hover { background: rgba(239, 68, 68, 0.25); color: #fca5a5; }
+    .btn-action.danger:active, .btn-xs.danger:active, .btn-log.danger:active { background: #ef4444; color: #fff; }
+    .btn-action.success, .btn-xs.success, .btn-log.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .btn-action.success:hover, .btn-xs.success:hover, .btn-log.success:hover { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; }
+    .btn-action.success:active, .btn-xs.success:active, .btn-log.success:active { background: #10b981; color: #fff; }
+    .btn-action.ping, .btn-action.warn, .btn-xs.warn, .btn-log.warn {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .btn-action.ping:hover, .btn-action.warn:hover, .btn-xs.warn:hover, .btn-log.warn:hover { background: rgba(245, 158, 11, 0.25); color: #fde68a; }
+    .btn-action.ping:active, .btn-action.warn:active, .btn-xs.warn:active, .btn-log.warn:active { background: #f59e0b; color: #000; }
+    .ping-result-box {
+      width: 100%;
+      height: 122px;
+      min-height: 122px;
+      max-height: 122px;
+      box-sizing: border-box;
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 11px;
+      line-height: 1.4;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .ping-result-box.idle {
+      border-color: rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .ping-result-box.ok {
+      border-color: rgba(52, 211, 153, 0.25);
+      background: rgba(16, 185, 129, 0.03);
+    }
+    .ping-result-box.warn {
+      border-color: rgba(245, 158, 11, 0.25);
+      background: rgba(245, 158, 11, 0.03);
+    }
+    .ping-result-box.fail {
+      border-color: rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.03);
+    }
+    .ping-title {
+      font-weight: 700;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 18px;
+    }
+    .ping-title.ok { color: #34d399; }
+    .ping-title.warn { color: #fbbf24; }
+    .ping-title.fail { color: #f87171; }
+    .ping-title.idle { color: var(--text-muted); }
+    .ping-line {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      line-height: 1.5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ping-label {
+      color: var(--text-muted);
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .ping-val {
+      color: #f1f5f9;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ping-val.mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 500;
+    }
+    .ping-val.lat-ok { color: #34d399; font-weight: 700; }
+    .ping-val.lat-warn { color: #fbbf24; font-weight: 700; }
+    .ping-val.lat-fail { color: #f87171; font-weight: 700; }
+    .ping-desc {
+      color: #94a3b8;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .divider { height: 1px; background: rgba(255,255,255,0.08); margin: 14px 0; }
+    .log-filter-group { display: inline-flex; background: #121316; border: 1px solid var(--card-border); border-radius: 8px; padding: 2px; gap: 3px; }
+    .filter-tab { padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; user-select: none; }
+    .filter-tab:hover { color: #fff; }
+    .filter-tab.active { background: #262934; color: #fff; }
+    .filter-tab.active#filterTabInfo { color: #60a5fa; background: rgba(59, 130, 246, 0.2); }
+    .filter-tab.active#filterTabWarn { color: #fbbf24; background: rgba(245, 158, 11, 0.2); }
+    .filter-tab.active#filterTabError { color: #f87171; background: rgba(239, 68, 68, 0.25); }
+    pre#logBox { background: #0a0b0d; color: #a5b4fc; padding: 10px; border-radius: 8px; font-size: 11px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; font-family: ui-monospace, monospace; border: 1px solid var(--card-border); margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部状态栏 -->
+  <div class="header">
+    <div class="title-group">
+      <h1>Tailscale Native</h1>
+      <div class="sub">KernelSU 纯内核模式 · 零 VPN 槽占用</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="btn-action default" onclick="refreshStatus(true)" title="立即强制与 Tailscale 云端同步状态">刷新</button>
+      <div id="statusBadge" class="badge red" onclick="refreshStatus(true)" style="cursor:pointer;" title="点击刷新状态">● 已停止</div>
+    </div>
+  </div>
+
+  <!-- 1. 本机网络信息卡片 (IPv4 & IPv6 双栈完整呈现) -->
+  <div class="card">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">📡</span>
+        <span class="card-title-text">本机网络信息</span>
+        <span class="tech-badge cyan">DUAL STACK</span>
+      </div>
+      <span id="daemonVersion" class="tech-badge gray">v--</span>
+    </div>
+
+    <!-- 舒适大触控区 IP 芯片卡片，与局域网设备列表完全对齐 -->
+    <div class="peer-ips" style="margin-bottom:10px;">
+      <div class="ip-chip" onclick="copyText(document.getElementById('ipv4').textContent)" title="点击复制 IPv4">
+        <div class="ip-chip-content">
+          <span class="ip-tag v4">IPv4</span>
+          <span class="ip-val-text" id="ipv4">—</span>
+        </div>
+        <div class="ip-copy-hint">复制</div>
+      </div>
+      <div class="ip-chip v6" onclick="copyText(document.getElementById('ipv6').textContent)" title="点击复制 IPv6">
+        <div class="ip-chip-content">
+          <span class="ip-tag v6">IPv6</span>
+          <span class="ip-val-text" id="ipv6">—</span>
+        </div>
+        <div class="ip-copy-hint">复制</div>
+      </div>
+    </div>
+
+    <!-- 详细参数列表 (多彩胶囊标签规范化) -->
+    <div class="setting-item">
+      <!-- 1. 设备名称 (Machines) -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading blue">HOST</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">设备名称 (Machines)</div>
+            <div class="switch-desc">当前设备在 Tailnet 网络中的设备标识名</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="hostname" class="info-val copyable" onclick="copyText(this.textContent)" title="点击复制" style="font-weight:600; color:#f1f5f9; font-size:13px;">—</span>
+          <button class="btn-action default" onclick="changeHostname()" title="自定义 Tailscale Machines 名称">改名</button>
+        </div>
+      </div>
+
+      <!-- 2. 网络连接状态 -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading green" id="badgeStateLead">STATE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">网络连接状态</div>
+            <div class="switch-desc">客户端底层引擎与云端协调节点连接状态</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="backendStateVal" class="info-val" style="font-size:12px; font-weight:600;">—</span>
+        </div>
+      </div>
+
+      <!-- 3. 主程序 PID -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading cyan">CORE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">主程序 PID</div>
+            <div class="switch-desc">tailscaled 核心网络数据包处理主进程号</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="mainPidVal" class="info-val copyable" onclick="copyText(this.textContent)" title="点击复制" style="color:#34d399; font-family:ui-monospace, monospace; font-size:12px; font-weight:600;">—</span>
+        </div>
+      </div>
+
+      <!-- 4. 服务守护进程 PID -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading green">DAEMON</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">守护进程 PID</div>
+            <div class="switch-desc">watchdog.sh 保活与状态守护监控进程号</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="pidVal" class="info-val copyable" onclick="copyText(this.textContent)" title="点击复制" style="color:#34d399; font-family:ui-monospace, monospace; font-size:12px; font-weight:600;">—</span>
+        </div>
+      </div>
+
+      <!-- 5. 虚拟网卡 (TUN) -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading purple">TUN</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">虚拟网卡 (TUN)</div>
+            <div class="switch-desc">Linux 内核网络协议栈虚拟路由接口</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="tunVal" class="info-val copyable" onclick="copyText(this.textContent)" title="点击复制" style="color:#60a5fa; font-family:ui-monospace, monospace; font-size:12px;">—</span>
+        </div>
+      </div>
+
+      <!-- 6. 当前官方后台 -->
+      <div class="switch-row" style="padding:6px 0; border-bottom:none; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading amber">DERP</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">控制后台</div>
+            <div class="switch-desc">节点协调服务器与设备权限管理控制台</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-shrink:0; max-width:55%;">
+          <span id="serverVal" class="link-clean" onclick="openControlPlane()" title="点击直接前往 Tailscale 控制台 ↗" style="font-size:11px; text-align:right;">Tailscale 官方后台 (controlplane.tailscale.com) ↗</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 服务快捷控制卡片 -->
+  <div class="card">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">⚙️</span>
+        <span class="card-title-text">服务进程管理</span>
+        <span class="tech-badge green">DAEMON</span>
+      </div>
+      <span class="tech-badge gray">CORE</span>
+    </div>
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+          <span class="tech-badge leading green">CTRL</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">核心运行控制</div>
+            <div class="switch-desc">管理 tailscaled 守护进程生命周期与后台常驻状态</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group" style="margin-top:0;">
+      <button class="btn-action success" style="flex:1; height:34px; font-size:12px;" onclick="startService()">启动服务</button>
+      <button class="btn-action primary" style="flex:1; height:34px; font-size:12px;" onclick="restartService()">重启服务</button>
+      <button class="btn-action danger" style="flex:1; height:34px; font-size:12px;" onclick="stopService()">停止服务</button>
+    </div>
+  </div>
+
+  <!-- 3. 账号认证绑定 (未登录时醒目高亮) -->
+  <div class="card" id="loginCard">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">🔐</span>
+        <span class="card-title-text">Tailscale 账号认证</span>
+        <span class="tech-badge blue">AUTH</span>
+      </div>
+      <span id="loginNotice" class="tech-badge amber">推荐使用 AUTH KEY</span>
+    </div>
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; margin-bottom:8px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+          <span class="tech-badge leading blue">KEY</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">设备身份认证</div>
+            <div class="switch-desc">输入 Tailscale 控制台生成的 Pre-auth key 快速绑定此设备</div>
+          </div>
+        </div>
+      </div>
+      <input type="text" id="authKeyInput" placeholder="输入 tskey-auth-... 可直接秒级绑定 (推荐)" style="margin-bottom:8px; font-size:12px; height:34px;">
+      <div class="btn-group" style="margin-top:0;">
+        <button class="btn-action primary" style="flex:1; height:34px; font-size:12px;" onclick="loginWithKey()">密钥一键绑定</button>
+        <button class="btn-action default" style="flex:1; height:34px; font-size:12px;" onclick="getLoginUrl()">获取网页登录链接</button>
+      </div>
+    </div>
+    <div class="setting-item" style="margin-bottom:0;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading red">RESET</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">重置登录凭证</div>
+            <div class="switch-desc">注销本机 Tailscale 登录状态并清除现有认证凭据</div>
+          </div>
+        </div>
+        <button class="btn-action danger" style="flex-shrink:0; height:34px; font-size:12px; padding:0 12px;" onclick="resetAuth()">重置解绑 ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 在线设备列表 (高频常用，排在前列) -->
+  <div class="card" id="peerCard">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">💻</span>
+        <span class="card-title-text">局域网设备列表</span>
+        <span class="tech-badge cyan">PEERS</span>
+      </div>
+      <span id="peerCountBadge" class="tech-badge gray">0 台</span>
+    </div>
+    <div id="peerListContainer">
+      <div class="tip" style="text-align:center; padding:12px;">正在获取设备列表...</div>
+    </div>
+  </div>
+
+  <!-- 5. 核心网络路由与 DNS 设置 (与代理分流协同) -->
+  <div class="card">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">🌐</span>
+        <span class="card-title-text">核心路由与 DNS</span>
+        <span class="tech-badge green">REALTIME</span>
+      </div>
+      <span class="tech-badge purple">ROUTING</span>
+    </div>
+    
+    <div class="setting-item">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading cyan">ROUTE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">接受子网路由</div>
+            <div class="switch-desc">允许访问 Tailnet 中其他节点广播的局域网子网 (<span class="code-chip cyan">Subnet Routes</span>)</div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="acceptRoutesSwitch" checked onchange="onToggleAcceptRoutes()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="setting-item" style="margin-bottom:0;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading purple">DNS</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">接受 Tailnet DNS</div>
+            <div class="switch-desc">建议关闭。关闭后将 DNS 完全交由 <span class="code-chip amber">外部代理</span> 或 <span class="code-chip blue">系统分流</span></div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="acceptDnsSwitch" onchange="onToggleAcceptDns()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 出口节点高级设置 (低频使用，下移至底部) -->
+  <div class="card" id="exitNodeCard">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">🚀</span>
+        <span class="card-title-text">出口节点高级设置</span>
+        <span class="tech-badge amber">EXIT NODE</span>
+      </div>
+      <span class="tech-badge purple">ROUTING</span>
+    </div>
+
+    <!-- 1. 指定出口节点 -->
+    <div class="section-title-bar" style="margin-top:2px; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-weight:700; font-size:13px; color:#34d399;">1. 指定出口节点</span>
+        <span class="tech-badge green">OUTBOUND</span>
+      </div>
+    </div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+      将本设备的网络流量通过 Tailnet 中指定的 <span style="color:#34d399; font-weight:600;">出口节点</span> 转发上网：
+    </div>
+    <div class="custom-select-wrapper" id="exitNodeDropdownWrapper">
+      <div class="custom-select-trigger" id="exitNodeTrigger" onclick="toggleExitNodeDropdown()">
+        <span id="exitNodeSelectedText" style="color:#94a3b8;">-- 选择已发现的 Exit Node --</span>
+        <span class="custom-select-arrow" id="exitNodeArrow">▼</span>
+      </div>
+      <div class="custom-select-options" id="exitNodeOptionsList" style="display:none;">
+        <div class="custom-option-item" onclick="selectCustomExitNode('', '')">
+          <span style="color:var(--text-muted);">不使用 Exit Node (直连上网)</span>
+        </div>
+      </div>
+    </div>
+    <select id="exitNodeSelect" style="display:none;" onchange="onExitNodeSelectChange()">
+      <option value="">-- 选择已发现的 Exit Node --</option>
+    </select>
+    <div style="display:flex; gap:6px; margin-bottom:10px; align-items:center;">
+      <input type="text" id="exitNodeInput" placeholder="或手动输入出口节点 IP / 主机名" onkeydown="if(event.key==='Enter') applyExitNode()" style="margin:0; font-size:12px; height:34px; font-family:ui-monospace, monospace; color:#67e8f9;">
+      <button class="btn-action primary" style="height:34px; padding:0 12px; font-size:12px;" onclick="applyExitNode()">应用节点</button>
+    </div>
+
+    <!-- 状态显示 -->
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading amber">STATUS</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">当前 Exit Node 状态</div>
+            <div class="switch-desc">当前网络流量出口转发与路由状态</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span id="exitNodeStatusVal" class="tech-badge gray">未启用 (直连上网)</span>
+          <button id="btnExitClear" class="btn-action danger" style="display:none;" onclick="disableExitNode()">停用</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 允许本地局域网访问 (Allow LAN Access) -->
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading cyan">LAN</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">允许局域网访问</div>
+            <div class="switch-desc">启用出口节点时，仍允许直接访问本地物理局域网设备</div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="allowLanSwitch" onchange="onToggleAllowLan()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="divider" style="margin:14px 0 10px 0;"></div>
+
+    <!-- 2. 自身作为 Exit Node 与 Subnet Routes 广播 -->
+    <div class="section-title-bar" style="margin-top:0; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-weight:700; font-size:13px; color:#fbbf24;">2. 自身广播服务</span>
+        <span class="tech-badge amber">BROADCAST</span>
+      </div>
+      <span class="tech-badge amber">需控制台批准</span>
+    </div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+      让其它设备使用本机上网或访问此手机所在物理网:
+    </div>
+
+    <!-- Exit Node 广播 -->
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading amber">SERVE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="switch-title" style="color:#f8fafc; font-weight:600;">广播本机作为 Exit Node 出口</span>
+              <span id="exitNodeAdvBadge" class="tech-badge green">广播中</span>
+            </div>
+            <div class="switch-desc">向网络广播当前手机作为 <code class="code-chip emerald">0.0.0.0/0, ::/0</code>，允许其他设备经本机上网</div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="advertiseExitSwitch" checked onchange="onToggleAdvertiseExit()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Subnet Routes 广播 -->
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="switch-row" style="padding:0; border:none; margin-bottom:8px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading cyan">SUBNET</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="switch-title" style="color:#f8fafc; font-weight:600;">广播子网路由</span>
+              <span id="subnetAdvBadge" class="tech-badge green">广播中</span>
+            </div>
+            <div class="switch-desc">允许远程设备直连手机所连接的 Wi-Fi 局域网网段</div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="advertiseRoutesSwitch" checked onchange="onToggleAdvertiseRoutes()">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="advertiseRoutesInput" onchange="onRoutesInputChange()" onkeydown="if(event.key==='Enter') this.blur()" placeholder="子网网段，如 192.168.31.0/24 (留空自动探测)" style="margin:0; font-size:12px; height:34px; font-family:ui-monospace, monospace; color:#38bdf8;">
+        <button class="btn-action primary" style="height:34px; padding:0 12px; font-size:12px;" onclick="autoDetectSubnets()" title="自动探测当前 Wi-Fi/热点网段并实时广播">探测并广播</button>
+      </div>
+    </div>
+
+    <div class="tip" style="margin-top:4px; font-size:11px; line-height:1.6;">
+      <b style="color:#fde68a;">为什么 tailscale 控制台显示未授权?</b><br>
+      ★ 本机发起路由广播 (Exit Node 与 Subnet routes) 需 tailscale 管理后台管理员赋予【<span style="color:#34d399; font-weight:600;">批准</span>】(Approved) 状态。<br>
+      👉 请在电脑或手机浏览器打开 <span class="link-clean" onclick="openExternalUrl('https://console.tailscale.com/')" title="前往 Tailscale 控制台 (https://console.tailscale.com/) ↗" style="cursor:pointer; color:#60a5fa; text-decoration:underline;">Tailscale 控制台 ↗</span>，找到本机，点击右侧 <b>··· -> Edit route settings</b>，勾选批准 <b style="color:#818cf8;">Subnet routes</b> 与 <b style="color:#34d399;">Exit node</b> 即可生效使用!
+    </div>
+  </div>
+
+  <!-- 7. 内核自动更新与备份 -->
+  <div class="card" id="updateCard">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">🔄</span>
+        <span class="card-title-text">内核自动更新与备份</span>
+        <span class="tech-badge blue">AUTO UPDATE</span>
+      </div>
+      <button class="btn-action primary" onclick="checkUpdate(true)">检查更新</button>
+    </div>
+    <div class="setting-item" style="margin-bottom:10px;">
+      <div class="info-row" style="padding:6px 0; display:flex; justify-content:space-between; align-items:center;">
+        <span class="info-label">核心版本</span>
+        <span id="updateCoreVer" class="tech-badge green">v1.102.4 (ARM64 Native)</span>
+      </div>
+      <div class="info-row" style="padding:6px 0; border-bottom:none; display:flex; justify-content:space-between; align-items:center;">
+        <span class="info-label">线上最新</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span id="updateLatestVer" class="info-val" style="color:var(--text-muted); font-size:12px;">尚未检测 (点击上方「检查更新」)</span>
+          <button id="btnDoUpdate" class="btn-action primary" style="display:none;" onclick="doUpdateCore()">立即更新</button>
+        </div>
+      </div>
+    </div>
+    <div class="setting-item">
+      <div class="switch-row" style="padding:0; margin-bottom:10px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading blue" style="font-size:8.5px; letter-spacing:0; padding:0 2px;">AUTO UPDATE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">自动检查并更新内核</div>
+            <div class="switch-desc">开启后后台发现稳定版新版本时将自动更新并平滑重启</div>
+          </div>
+        </div>
+        <label class="toggle" style="flex-shrink:0;">
+          <input type="checkbox" id="autoUpdateSwitch" onchange="onToggleAutoUpdate()">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- 自动检测周期 (使用自定义暗黑毛玻璃下拉组件) -->
+      <div class="switch-row" id="updateIntervalRow" style="padding:0; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding-right:12px;">
+          <span class="tech-badge leading purple">CYCLE</span>
+          <div class="switch-info" style="padding-right:0; min-width:0;">
+            <div class="switch-title" style="color:#f8fafc; font-weight:600;">自动检测周期</div>
+            <div class="switch-desc">符合条件在后台优化无感静默 (默认每天)</div>
+          </div>
+        </div>
+        <div class="custom-select-wrapper" id="intervalDropdownWrapper" style="margin:0; position:relative; flex-shrink:0;">
+          <div class="custom-select-trigger" id="intervalTrigger" onclick="toggleIntervalDropdown()" style="padding:6px 12px; height:34px; border-radius:8px; background:#121316; border:1px solid var(--card-border); font-size:12px; min-width:130px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+            <span id="intervalSelectedText" style="color:#f1f5f9; font-weight:500;">每天 (24 小时)</span>
+            <span class="custom-select-arrow" id="intervalArrow" style="font-size:10px; color:#94a3b8; transition:transform 0.2s;">▼</span>
+          </div>
+          <div class="custom-select-options" id="intervalOptionsList" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:auto; background:#161820; border:1px solid rgba(59,130,246,0.4); border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.6); z-index:100; min-width:145px; padding:4px;">
+            <div class="custom-option-item active" data-val="86400" onclick="selectIntervalOption('86400', '每天 (24 小时)')">
+              <span style="color:#fff;">每天 (24 小时)</span>
+              <span class="check-mark" style="color:#60a5fa; font-size:11px; margin-left:8px;">✓</span>
+            </div>
+            <div class="custom-option-item" data-val="43200" onclick="selectIntervalOption('43200', '每 12 小时')">
+              <span style="color:#cbd5e1;">每 12 小时</span>
+              <span class="check-mark" style="display:none; color:#60a5fa; font-size:11px; margin-left:8px;">✓</span>
+            </div>
+            <div class="custom-option-item" data-val="21600" onclick="selectIntervalOption('21600', '每 6 小时')">
+              <span style="color:#cbd5e1;">每 6 小时</span>
+              <span class="check-mark" style="display:none; color:#60a5fa; font-size:11px; margin-left:8px;">✓</span>
+            </div>
+            <div class="custom-option-item" data-val="604800" onclick="selectIntervalOption('604800', '每周')">
+              <span style="color:#cbd5e1;">每周</span>
+              <span class="check-mark" style="display:none; color:#60a5fa; font-size:11px; margin-left:8px;">✓</span>
+            </div>
+          </div>
+          <select id="updateIntervalSelect" style="display:none;" onchange="onUpdateIntervalChange()">
+            <option value="86400" selected>每天 (24 小时)</option>
+            <option value="43200">每 12 小时</option>
+            <option value="21600">每 6 小时</option>
+            <option value="604800">每周</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 实时日志查看卡片 (排错利器) -->
+  <div class="card">
+    <div class="card-title">
+      <div class="card-title-left">
+        <span class="card-title-icon">📋</span>
+        <span class="card-title-text">底层运行日志</span>
+        <span class="tech-badge gray">LOGS</span>
+      </div>
+      <span class="tech-badge gray">tailscaled.log</span>
+    </div>
+    <div id="logArea">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <div class="log-filter-group" style="align-items:center;">
+          <span class="filter-tab active" id="filterTabAll" onclick="setLogLevel('ALL')">全部</span>
+          <span class="filter-tab" id="filterTabInfo" onclick="setLogLevel('INFO')">信息</span>
+          <span class="filter-tab" id="filterTabWarn" onclick="setLogLevel('WARN')">警告</span>
+          <span class="filter-tab" id="filterTabError" onclick="setLogLevel('ERROR')">错误</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <button class="btn-action default" onclick="fetchLogs()">刷新日志</button>
+          <button class="btn-action primary" onclick="copyLogs()">复制日志</button>
+          <button class="btn-action danger" onclick="clearLogs()">清除日志</button>
+        </div>
+      </div>
+      <pre id="logBox">正在加载日志...</pre>
+    </div>
+  </div>
+
+  <!-- 通用居中弹窗 (确认 / 改名 / 提示) -->
+  <div id="generalModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:99999; align-items:center; justify-content:center; padding:16px;">
+    <div class="modal-box" style="background:#16181d; border:1px solid var(--card-border); border-radius:14px; padding:18px; max-width:380px; width:100%; box-shadow:0 12px 36px rgba(0,0,0,0.7);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span id="generalModalTitle" style="font-size:13px; font-weight:700; color:#fff;">提示</span>
+        <button class="btn-action danger" onclick="closeGeneralModal(false)">关闭</button>
+      </div>
+      <div id="generalModalBody" style="font-size:12px; color:#cbd5e1; line-height:1.6; margin-bottom:14px; word-break:break-all;">
+      </div>
+      <input type="text" id="generalModalInput" style="display:none; margin-bottom:14px; font-size:13px; background:#101114; border:1px solid var(--card-border); border-radius:8px; padding:8px 12px; color:#fff; width:100%; box-sizing:border-box;">
+      <div class="btn-group" id="generalModalBtns" style="margin-top:0;">
+        <button class="btn-action default" style="flex:1; height:32px; font-size:12px;" onclick="closeGeneralModal(false)">取消</button>
+        <button id="generalModalConfirmBtn" class="btn-action primary" style="flex:1; height:32px; font-size:12px;" onclick="closeGeneralModal(true)">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 网页授权登录弹窗 (居中弹出，持久显示) -->
+  <div id="urlModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+    <div class="modal-box" style="background:#16181d; border:1px solid var(--card-border); border-radius:14px; padding:18px; max-width:440px; width:100%; box-shadow:0 12px 36px rgba(0,0,0,0.7);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:13px; font-weight:600; color:#93c5fd;">网页授权登录认证</span>
+        <button class="btn-action danger" onclick="closeLoginUrl()">关闭</button>
+      </div>
+      <div id="loginUrlText" onclick="copyLoginUrl()" title="点击复制链接" style="background:#0a0b0d; padding:10px; border-radius:8px; border:1px dashed #3b82f6; font-family:ui-monospace, monospace; font-size:11px; word-break:break-all; color:#93c5fd; cursor:pointer; margin-bottom:12px;">
+      </div>
+      <div class="btn-group">
+        <button class="primary" style="flex:1;" onclick="openLoginUrl()">在默认浏览器打开 ↗</button>
+        <button style="flex:1;" onclick="copyLoginUrl()">复制链接</button>
+        <button class="success" style="flex:1;" onclick="confirmAuthSync()">激活连通</button>
+      </div>
+      <div class="tip" style="margin-top:12px; font-size:11px; color:#94a3b8; line-height:1.6;">
+        <b>操作指南</b>：<br>
+        1. 点击 <b>【在默认浏览器打开 ↗】</b> 唤起系统外部浏览器（Chrome/Via等）登录授权；<br>
+        2. 登录完成后<b>直接切回本页面即可</b>，后台会自动检测并激活连通，无需一步步按返回键！
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const HELPER = "sh /data/adb/modules/tailscale_native/webui.sh";
+    window._ksuCallbacks = {};
+    let cbIndex = 0;
+
+    function runHelper(cmdArgs, timeoutMs = 8000) {
+      return new Promise((resolve, reject) => {
+        if (!window.ksu || typeof window.ksu.exec !== "function") {
+          return resolve(handleMockPreview(cmdArgs));
+        }
+        const id = `cb_${++cbIndex}`;
+        const timer = setTimeout(() => {
+          if (window._ksuCallbacks[id]) {
+            delete window._ksuCallbacks[id];
+            reject("Timeout");
+          }
+        }, timeoutMs);
+
+        window._ksuCallbacks[id] = (code, stdout, stderr) => {
+          clearTimeout(timer);
+          delete window._ksuCallbacks[id];
+          if (code === 0) resolve((stdout || "").trim());
+          else reject(stderr || stdout || `Error code ${code}`);
+        };
+        try {
+          window.ksu.exec(`${HELPER} ${cmdArgs}`, null, `window._ksuCallbacks.${id}`);
+        } catch (e) {
+          clearTimeout(timer);
+          delete window._ksuCallbacks[id];
+          reject(e);
+        }
+      });
+    }
+
+    // 浏览器预览模式下的 Mock 数据支持
+    let mockLoggedIn = true;
+    let mockRunning = true;
+    let mockActiveExit = "";
+    let mockCustomHostname = "";
+    function handleMockPreview(cmd) {
+      if (cmd.startsWith("status")) {
+        return JSON.stringify({
+          running: mockRunning,
+          main_pid: mockRunning ? "14476" : "",
+          daemon_pid: mockRunning ? "14477" : "",
+          pid: mockRunning ? "14477" : "",
+          version: "v1.102.4",
+          auto_update: "false",
+          update_interval: "86400",
+          latest_version: "",
+          device_model: "Pixel 7 Pro",
+          cert_model: "cheetah",
+          custom_hostname: mockCustomHostname,
+          priority_hostname: "Pixel-7-Pro",
+          accept_routes: "false",
+          accept_dns: "false",
+          exit_node_allow_lan: "true",
+          advertise_exit_node: "false",
+          advertise_routes_enabled: "false",
+          advertise_routes: "192.168.2.0/24",
+          exit_node: mockActiveExit,
+          auth_url: "",
+          raw_status: {
+            BackendState: mockRunning ? (mockLoggedIn ? "Running" : "NeedsLogin") : "Stopped",
+            Self: {
+              HostName: mockCustomHostname || "Pixel-7-Pro",
+              TailscaleIPs: mockLoggedIn ? ["100.86.10.25", "fd7a:115c:a1e0::25"] : [],
+              InNetworkMap: mockLoggedIn
+            },
+            Peer: mockLoggedIn ? {
+              "nas": {
+                HostName: "nas-home",
+                OS: "linux",
+                TailscaleIPs: ["100.86.10.2", "fd7a:115c:a1e0::2"],
+                Online: true,
+                ExitNodeOption: false,
+                CurAddr: "192.168.1.100:41641"
+              },
+              "us-exit": {
+                HostName: "us-vps-gateway",
+                OS: "linux",
+                TailscaleIPs: ["100.86.10.88", "fd7a:115c:a1e0::88"],
+                Online: true,
+                ExitNodeOption: true,
+                Relay: "tokyo"
+              },
+              "macbook": {
+                HostName: "macbook-pro",
+                OS: "macOS",
+                TailscaleIPs: ["100.86.10.3", "fd7a:115c:a1e0::3"],
+                Online: true,
+                ExitNodeOption: false,
+                CurAddr: "192.168.1.105:41641"
+              },
+              "win11": {
+                HostName: "desktop-pc",
+                OS: "windows",
+                TailscaleIPs: ["100.86.10.4", "fd7a:115c:a1e0::4"],
+                Online: false,
+                ExitNodeOption: false
+              }
+            } : {}
+          }
+        });
+      } else if (cmd.startsWith("ping")) {
+        if (cmd.includes("desktop-pc") || cmd.includes("100.86.10.4")) {
+          return "timed out waiting for pong from desktop-pc";
+        } else if (cmd.includes("us-vps") || cmd.includes("100.86.10.88")) {
+          return "pong from us-vps-gateway (100.86.10.88) via DERP(tokyo) in 142.5ms";
+        } else {
+          return "pong from nas-home (100.86.10.2) via 192.168.1.100:41641 in 2.3ms";
+        }
+      } else if (cmd.startsWith("set_exit_node")) {
+        const parts = cmd.split("'");
+        mockActiveExit = parts[1] || "";
+        return "OK";
+      } else if (cmd.startsWith("detect_subnets")) {
+        return JSON.stringify({ subnets: "192.168.2.0/24" });
+      } else if (cmd.startsWith("login_key")) {
+        mockLoggedIn = true;
+        return "OK";
+      } else if (cmd.startsWith("logout")) {
+        mockLoggedIn = false;
+        return "OK";
+      } else if (cmd.startsWith("login_url")) {
+        return JSON.stringify({ url: "https://login.tailscale.com/a/mock12345678" });
+      } else if (cmd.startsWith("open_url")) {
+        return "OK";
+      } else if (cmd.startsWith("logs")) {
+        return "[2026/09/14 03:00:00] [INFO] Starting tailscaled native daemon v1.102.4 (arm64)...\n" +
+               "[2026/09/14 03:00:01] [INFO] logtail: version 1.102.4-tdeadbeef (linux/arm64)\n" +
+               "[2026/09/14 03:00:01] [INFO] wgengine: created wireguard interface tailscale0\n" +
+               "[2026/09/14 03:00:01] [WARN] dns: /etc/resolv.conf missing, using bind-mount fallback 223.5.5.5\n" +
+               "[2026/09/14 03:00:02] [INFO] control: mapRoutine: connected to controlplane.tailscale.com\n" +
+               "[2026/09/14 03:00:02] [INFO] magicsock: derp-11 connected; direct path to nas-home (192.168.1.100:41641)\n" +
+               "[2026/09/14 03:00:03] [WARN] control: rate limit active, 2 duplicate discovery frames dropped\n" +
+               "[2026/09/14 03:00:04] [INFO] router: routes updated: 100.64.0.0/10 dev tailscale0\n" +
+               "[2026/09/14 03:00:05] [ERROR] peer-probe: ping to 100.86.10.4 timed out waiting for pong\n" +
+               "[2026/09/14 03:00:06] [INFO] health: operating normally, 3 peers online";
+      } else if (cmd.startsWith("set_hostname")) {
+        const parts = cmd.split("'");
+        mockCustomHostname = parts[1] || "";
+        return "OK";
+      } else if (cmd.startsWith("check_update")) {
+        return JSON.stringify({ current: "1.102.4", latest: "1.102.4" });
+      } else if (cmd.startsWith("do_update")) {
+        return "OK";
+      } else if (cmd.startsWith("set_auto_update")) {
+        return "OK";
+      } else if (cmd.startsWith("clear_logs")) {
+        return "OK";
+      } else if (cmd.startsWith("stop")) {
+        mockRunning = false;
+        return "OK";
+      } else if (cmd.startsWith("start") || cmd.startsWith("restart")) {
+        mockRunning = true;
+        return "OK";
+      }
+      return "OK";
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      if (!t) return;
+      let text = String(msg || '');
+      if (text.length > 80) {
+        text = text.substring(0, 77) + '...';
+      }
+      t.textContent = text;
+      t.classList.add("show");
+      t.style.opacity = "1";
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        t.classList.remove("show");
+        t.style.opacity = "0";
+      }, 2400);
+    }
+
+    let generalModalResolver = null;
+    function showConfirmDialog(title, message, confirmText = "确定", isDanger = false) {
+      return new Promise((resolve) => {
+        generalModalResolver = resolve;
+        const modal = document.getElementById("generalModal");
+        document.getElementById("generalModalTitle").textContent = title;
+        const bodyEl = document.getElementById("generalModalBody");
+        bodyEl.innerHTML = escapeHtml(message).replace(/\n/g, '<br>');
+        const inputEl = document.getElementById("generalModalInput");
+        inputEl.style.display = "none";
+        inputEl.value = "";
+        const confirmBtn = document.getElementById("generalModalConfirmBtn");
+        confirmBtn.textContent = confirmText;
+        confirmBtn.className = isDanger ? "btn-action danger" : "btn-action primary";
+        if (modal) modal.style.display = "flex";
+      });
+    }
+
+    function showPromptDialog(title, message, defaultValue = "") {
+      return new Promise((resolve) => {
+        generalModalResolver = resolve;
+        const modal = document.getElementById("generalModal");
+        document.getElementById("generalModalTitle").textContent = title;
+        const bodyEl = document.getElementById("generalModalBody");
+        bodyEl.innerHTML = escapeHtml(message).replace(/\n/g, '<br>');
+        const inputEl = document.getElementById("generalModalInput");
+        inputEl.style.display = "block";
+        inputEl.value = defaultValue;
+        const confirmBtn = document.getElementById("generalModalConfirmBtn");
+        confirmBtn.textContent = "确定";
+        confirmBtn.className = "btn-action primary";
+        if (modal) {
+          modal.style.display = "flex";
+          setTimeout(() => inputEl.focus(), 100);
+        }
+      });
+    }
+
+    function closeGeneralModal(confirmed) {
+      const modal = document.getElementById("generalModal");
+      const inputEl = document.getElementById("generalModalInput");
+      const isPrompt = inputEl && inputEl.style.display !== "none";
+      if (modal) modal.style.display = "none";
+      if (generalModalResolver) {
+        if (isPrompt) {
+          generalModalResolver(confirmed ? inputEl.value : null);
+        } else {
+          generalModalResolver(!!confirmed);
+        }
+        generalModalResolver = null;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function copyText(val, customTip) {
+      if (!val || val === '—') return false;
+      const textToCopy = String(val).trim();
+      let ok = false;
+
+      // 1. 尝试使用现代 Clipboard API
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          ok = true;
+        } catch (e) {
+          console.warn("navigator.clipboard write failed:", e);
+        }
+      }
+
+      // 2. 强力通用兜底：使用无感 textarea + document.execCommand('copy')
+      if (!ok) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = textToCopy;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.top = "0";
+          ta.style.left = "0";
+          ta.style.width = "2em";
+          ta.style.height = "2em";
+          ta.style.padding = "0";
+          ta.style.border = "none";
+          ta.style.outline = "none";
+          ta.style.boxShadow = "none";
+          ta.style.background = "transparent";
+          ta.style.opacity = "0.01";
+          ta.style.zIndex = "-1";
+          document.body.appendChild(ta);
+
+          ta.focus({ preventScroll: true });
+          ta.select();
+          ta.setSelectionRange(0, textToCopy.length);
+
+          ok = document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch (err) {
+          console.warn("document.execCommand fallback failed:", err);
+          ok = false;
+        }
+      }
+
+      // 3. 友好反馈处理
+      if (ok) {
+        if (customTip) {
+          showToast(customTip);
+        } else if (textToCopy.length <= 25) {
+          showToast("已复制: " + textToCopy);
+        } else {
+          showToast("已成功复制到剪贴板！");
+        }
+      } else {
+        showToast("复制受限，请长按文本手动复制");
+      }
+      return ok;
+    }
+
+    let isSettingsBusy = false;
+
+    function toggleExitNodeDropdown() {
+      const list = document.getElementById("exitNodeOptionsList");
+      const arrow = document.getElementById("exitNodeArrow");
+      if (!list) return;
+      const isOpen = (list.style.display !== "none");
+      if (isOpen) {
+        closeExitNodeDropdown();
+      } else {
+        list.style.display = "block";
+        if (arrow) arrow.classList.add("open");
+      }
+    }
+
+    function closeExitNodeDropdown() {
+      const list = document.getElementById("exitNodeOptionsList");
+      const arrow = document.getElementById("exitNodeArrow");
+      if (list) list.style.display = "none";
+      if (arrow) arrow.classList.remove("open");
+    }
+
+    document.addEventListener("click", (e) => {
+      const wrapper = document.getElementById("exitNodeDropdownWrapper");
+      if (wrapper && !wrapper.contains(e.target)) {
+        closeExitNodeDropdown();
+      }
+      const intervalWrapper = document.getElementById("intervalDropdownWrapper");
+      if (intervalWrapper && !intervalWrapper.contains(e.target)) {
+        const list = document.getElementById("intervalOptionsList");
+        const arrow = document.getElementById("intervalArrow");
+        if (list) list.style.display = "none";
+        if (arrow) arrow.classList.remove("open");
+      }
+    });
+
+    function selectCustomExitNode(ip, name) {
+      closeExitNodeDropdown();
+      document.getElementById("exitNodeInput").value = ip;
+      const sel = document.getElementById("exitNodeSelect");
+      if (sel) sel.value = ip;
+      const triggerText = document.getElementById("exitNodeSelectedText");
+      if (ip) {
+        if (triggerText) triggerText.textContent = `🟢 ${name || ip} (${ip})`;
+        quickSetExitNode(ip);
+      } else {
+        if (triggerText) triggerText.textContent = "-- 选择已发现的 Exit Node --";
+        disableExitNode();
+      }
+    }
+
+    function onExitNodeSelectChange() {
+      const val = document.getElementById("exitNodeSelect").value;
+      document.getElementById("exitNodeInput").value = val;
+      if (val) {
+        applyExitNode();
+      } else {
+        disableExitNode();
+      }
+    }
+
+    function quickSetExitNode(node) {
+      document.getElementById("exitNodeInput").value = node;
+      const triggerText = document.getElementById("exitNodeSelectedText");
+      if (triggerText) triggerText.textContent = `🟢 已选择: ${node}`;
+      applyExitNode();
+    }
+
+    async function saveConfig() {
+      const routes = document.getElementById("acceptRoutesSwitch").checked ? "true" : "false";
+      const dns = document.getElementById("acceptDnsSwitch").checked ? "true" : "false";
+      isSettingsBusy = true;
+      try {
+        await runHelper(`save_config ${routes} ${dns}`);
+      } catch (e) {
+        console.error("saveConfig error:", e);
+        throw e;
+      } finally {
+        setTimeout(() => { isSettingsBusy = false; }, 1500);
+      }
+    }
+
+    async function onToggleAcceptRoutes() {
+      const routes = document.getElementById("acceptRoutesSwitch").checked ? "true" : "false";
+      showToast(routes === "true" ? "已开启接受子网路由 (实时生效)" : "已关闭接受子网路由 (实时生效)");
+      try {
+        await saveConfig();
+      } catch (e) {
+        showToast("设置失败: " + e);
+        document.getElementById("acceptRoutesSwitch").checked = (routes !== "true");
+      }
+    }
+
+    async function onToggleAcceptDns() {
+      const sw = document.getElementById("acceptDnsSwitch");
+      if (sw.checked) {
+        alert("【提示】Android 系统的 /etc 分区为只读，且系统原生完全通过 netd 管理网络解析，不支持也不需要改写 /etc/resolv.conf。\n\n开启此项将导致底层报 atomicWriteFile: read-only file system 异常。\n\n如需使用 MagicDNS，请在系统私有 DNS 或外部代理规则中将上游 DNS 指向 100.100.100.100 即可。");
+        sw.checked = false;
+        return;
+      }
+      showToast("已保持关闭 Tailnet DNS");
+      try {
+        await saveConfig();
+      } catch (e) {
+        showToast("设置失败: " + e);
+      }
+    }
+
+    async function onToggleAllowLan() {
+      const enabled = document.getElementById("allowLanSwitch").checked ? "true" : "false";
+      isSettingsBusy = true;
+      showToast(enabled === "true" ? "正在开启本地局域网访问..." : "正在关闭本地局域网访问...");
+      try {
+        await runHelper(`set_exit_node_allow_lan ${enabled}`);
+        showToast(enabled === "true" ? "已开启本地局域网访问 (实时生效)" : "已关闭本地局域网访问 (实时生效)");
+      } catch (e) {
+        showToast("设置失败: " + e);
+        document.getElementById("allowLanSwitch").checked = (enabled !== "true");
+      } finally {
+        setTimeout(() => { isSettingsBusy = false; }, 1500);
+      }
+    }
+
+    function updateAdvBadges(advExit, advRoutes) {
+      const exitBadge = document.getElementById("exitNodeAdvBadge");
+      if (exitBadge) {
+        exitBadge.className = advExit ? "tech-badge green" : "tech-badge gray";
+        exitBadge.textContent = advExit ? "广播中" : "未开启";
+        exitBadge.style.background = "";
+        exitBadge.style.color = "";
+        exitBadge.style.border = "";
+      }
+
+      const subnetBadge = document.getElementById("subnetAdvBadge");
+      if (subnetBadge) {
+        subnetBadge.className = advRoutes ? "tech-badge green" : "tech-badge gray";
+        subnetBadge.textContent = advRoutes ? "广播中" : "未开启";
+        subnetBadge.style.background = "";
+        subnetBadge.style.color = "";
+        subnetBadge.style.border = "";
+      }
+    }
+
+    async function onToggleAdvertiseExit() {
+      await applyAdvertiseSettings(true);
+    }
+
+    async function onToggleAdvertiseRoutes() {
+      await applyAdvertiseSettings(true);
+    }
+
+    async function onRoutesInputChange() {
+      await applyAdvertiseSettings(false);
+    }
+
+    async function autoDetectSubnets() {
+      showToast("正在探测本地网络网段...");
+      try {
+        const raw = await runHelper("detect_subnets");
+        const res = JSON.parse(raw);
+        if (res.subnets) {
+          document.getElementById("advertiseRoutesInput").value = res.subnets;
+          showToast("探测到子网: " + res.subnets + "，正在实时同步广播...");
+          await applyAdvertiseSettings(false);
+        } else {
+          showToast("未探测到活跃私有网段");
+        }
+      } catch (e) {
+        showToast("探测失败: " + e);
+      }
+    }
+
+    async function applyAdvertiseSettings(isSwitch = true) {
+      const exitEn = document.getElementById("advertiseExitSwitch").checked ? "true" : "false";
+      const routesEn = document.getElementById("advertiseRoutesSwitch").checked ? "true" : "false";
+      const routesVal = (document.getElementById("advertiseRoutesInput").value || "").trim();
+
+      isSettingsBusy = true;
+      updateAdvBadges(exitEn === "true", routesEn === "true");
+
+      if (isSwitch) {
+        showToast(exitEn === "true" || routesEn === "true" ? "正在实时同步广播..." : "正在取消广播同步...");
+      }
+      try {
+        await runHelper(`save_advertise ${exitEn} ${routesEn} '${routesVal}'`);
+        showToast("广播设置已实时生效！");
+      } catch (e) {
+        showToast("广播设置失败: " + e);
+      } finally {
+        setTimeout(() => { isSettingsBusy = false; }, 1500);
+      }
+    }
+
+    let lastPeersList = [];
+    let lastPeersSig = "";
+
+    function renderPeerList(raw, activeNode) {
+      const container = document.getElementById("peerListContainer");
+      const countBadge = document.getElementById("peerCountBadge");
+      
+      if (!raw || !raw.Peer) {
+        if (lastPeersSig !== "empty") {
+          container.innerHTML = '<div class="tip" style="text-align:center; padding:16px; color:var(--text-muted);">⚠️ 设备未连接网络或已从控制台解绑，暂无对端节点</div>';
+          countBadge.textContent = "0 台";
+          lastPeersSig = "empty";
+          lastPeersList = [];
+        }
+        return;
+      }
+
+      const peers = Object.values(raw.Peer);
+      if (peers.length === 0) {
+        if (lastPeersSig !== "zero") {
+          container.innerHTML = '<div class="tip" style="text-align:center; padding:16px; color:var(--text-muted);">Tailnet 中暂无其他设备</div>';
+          countBadge.textContent = "0 台";
+          lastPeersSig = "zero";
+          lastPeersList = [];
+        }
+        return;
+      }
+
+      peers.sort((a, b) => (b.Online === true ? 1 : 0) - (a.Online === true ? 1 : 0));
+      const onlineCount = peers.filter(p => p.Online).length;
+      countBadge.textContent = `${onlineCount} 在线 / ${peers.length} 台设备`;
+
+      const currentIds = peers.map(p => {
+        const ips = p.TailscaleIPs || [];
+        const ipv4 = ips.find(ip => ip.includes('.')) || '—';
+        return (p.HostName || '').replace(/[^a-zA-Z0-9]/g, '_') + '_' + (ipv4 || '').replace(/[^0-9]/g, '');
+      });
+
+      const canUpdateInPlace = lastPeersList.length === currentIds.length &&
+        lastPeersList.every((id, idx) => id === currentIds[idx]);
+
+      if (canUpdateInPlace) {
+        peers.forEach((p, idx) => {
+          const pSafeId = currentIds[idx];
+          const isOnline = !!p.Online;
+          const connType = p.CurAddr ? 'P2P 直连' : (p.Relay ? `中继 (${p.Relay})` : (isOnline ? '在线' : '离线'));
+
+          const dot = document.getElementById(`peer_dot_${pSafeId}`);
+          if (dot) dot.className = `dot ${isOnline ? 'online' : 'offline'}`;
+
+          const connElem = document.getElementById(`peer_conn_${pSafeId}`);
+          if (connElem && connElem.textContent !== connType) connElem.textContent = connType;
+
+          const readyElem = document.getElementById(`peer_ready_${pSafeId}`);
+          if (readyElem) {
+            readyElem.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+            readyElem.className = isOnline ? 'tech-badge green' : 'tech-badge gray';
+          }
+
+          const isPinging = activePings.has(pSafeId);
+          const btn = document.getElementById(`btn_ping_${pSafeId}`);
+          if (btn && !isPinging && btn.textContent !== "Ping 测速") {
+            btn.textContent = "Ping 测速";
+          }
+
+          // Ping 结果框在非测速状态下平稳展示，绝不重复覆写引起文字闪烁
+          const box = document.getElementById(`ping_box_${pSafeId}`);
+          if (box && !isPinging) {
+            const cachedPing = pingResultsCache[pSafeId];
+            if (cachedPing && cachedPing.html) {
+              const expectedClass = "ping-result-box " + (cachedPing.state || (cachedPing.ok ? "ok" : "fail"));
+              if (box.className !== expectedClass) box.className = expectedClass;
+              if (box.getAttribute("data-cached-ts") !== String(cachedPing.timestamp)) {
+                box.innerHTML = cachedPing.html;
+                box.setAttribute("data-cached-ts", String(cachedPing.timestamp));
+              }
+            }
+          }
+        });
+        return;
+      }
+
+      lastPeersList = currentIds;
+      lastPeersSig = currentIds.join(';') + '|' + (activeNode || '');
+
+      let html = '';
+      peers.forEach((p, idx) => {
+        const pSafeId = currentIds[idx];
+        const ips = p.TailscaleIPs || [];
+        const ipv4 = ips.find(ip => ip.includes('.')) || '—';
+        const ipv6 = ips.find(ip => ip.includes(':')) || '';
+        const isOnline = !!p.Online;
+        const isExitNode = !!p.ExitNodeOption;
+        const isCurrentExit = (activeNode && (activeNode === ipv4 || activeNode === p.HostName));
+        const os = p.OS || 'device';
+        const connType = p.CurAddr ? 'P2P 直连' : (p.Relay ? `中继 (${p.Relay})` : (isOnline ? '在线' : '离线'));
+
+        const cachedPing = pingResultsCache[pSafeId];
+        const isPinging = activePings.has(pSafeId);
+        let pingClass = "ping-result-box";
+        let pingContent = "";
+        let cachedTs = "";
+
+        if (isPinging) {
+          pingClass = "ping-result-box";
+          pingContent = `
+            <div class="ping-title idle">
+              <span class="tech-badge blue">PROBING</span>
+              <span style="font-size:11px; color:#93c5fd; margin-left:6px;">正在探测连通性...</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(ipv4 || p.HostName)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 探测状态:</span><span class="ping-desc">正在向节点发送探针，测量往返延迟与直连通道</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路协商:</span><span class="ping-desc">正在检测 P2P 直连打洞与 DERP 中继连通性</span></div>
+            <div class="ping-line"><span class="ping-label">• 提示信息:</span><span class="ping-desc">通常在 1~3 秒内完成探测，请稍候</span></div>
+          `;
+        } else if (cachedPing) {
+          pingClass = "ping-result-box " + (cachedPing.state || (cachedPing.ok ? "ok" : "fail"));
+          pingContent = cachedPing.html || escapeHtml(cachedPing.text);
+          cachedTs = String(cachedPing.timestamp || "");
+        } else {
+          pingClass = "ping-result-box idle";
+          pingContent = `
+            <div class="ping-title idle">
+              <span class="tech-badge gray">IDLE</span>
+              <span style="font-size:11px; color:var(--text-muted); margin-left:6px;">暂无测速数据</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 测量指标:</span><span class="ping-desc">往返延迟 (RTT)、P2P 直连通道与中继链路状态</span></div>
+            <div class="ping-line"><span class="ping-label">• 操作指引:</span><span class="ping-desc">点击上方「Ping 测速」即可发起实时连通性探测</span></div>
+            <div class="ping-line"><span class="ping-label">• 直连优势:</span><span class="ping-desc">直连通道延迟更低、带宽更高且不占用官方中继</span></div>
+            <div class="ping-line"><span class="ping-label">• 窗口说明:</span><span class="ping-desc">测速结果将在此常驻展示，保持卡片平稳不抖动</span></div>
+          `;
+        }
+
+        const pingBtnText = isPinging ? "探测中..." : "Ping 测速";
+
+        html += `
+          <div class="peer-item" id="peer_item_${pSafeId}">
+            <div class="peer-top">
+              <div class="peer-name-grp">
+                <span class="dot ${isOnline ? 'online' : 'offline'}" id="peer_dot_${pSafeId}"></span>
+                <span class="peer-name">${escapeHtml(p.HostName)}</span>
+                <span class="tech-badge gray">${escapeHtml(os)}</span>
+                ${isExitNode ? '<span class="tech-badge amber">EXIT NODE</span>' : ''}
+                ${isCurrentExit ? '<span class="tech-badge green">当前出口</span>' : ''}
+              </div>
+              <span class="peer-conn" id="peer_conn_${pSafeId}">${connType}</span>
+            </div>
+
+            <!-- 舒适大触控区 IP 芯片卡片，完整换行并一键复制 -->
+            <div class="peer-ips">
+              <div class="ip-chip" onclick="copyText('${ipv4}')" title="点击复制 IPv4">
+                <div class="ip-chip-content">
+                  <span class="ip-tag v4">IPv4</span>
+                  <span class="ip-val-text">${ipv4}</span>
+                </div>
+                <div class="ip-copy-hint">复制</div>
+              </div>
+              ${ipv6 ? `
+              <div class="ip-chip v6" onclick="copyText('${ipv6}')" title="点击复制 IPv6">
+                <div class="ip-chip-content">
+                  <span class="ip-tag v6">IPv6</span>
+                  <span class="ip-val-text">${ipv6}</span>
+                </div>
+                <div class="ip-copy-hint">复制</div>
+              </div>` : ''}
+            </div>
+
+            <!-- 底部操作栏：Ping 测速与出口绑定 -->
+            <div class="peer-bottom-bar">
+              <span id="peer_ready_${pSafeId}" class="tech-badge ${isOnline ? 'green' : 'gray'}">${isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+              <div class="peer-actions-right">
+                <button class="btn-action ping" id="btn_ping_${pSafeId}" onclick="pingPeer('${ipv4 || p.HostName}', '${pSafeId}')" title="测试该节点连通性与网络延迟">${pingBtnText}</button>
+                ${isExitNode ? (isCurrentExit ?
+                  `<button class="btn-action danger" onclick="disableExitNode()">停用出口</button>` :
+                  `<button class="btn-action primary" onclick="quickSetExitNode('${ipv4}')">设为出口</button>`) : ''}
+              </div>
+            </div>
+            <div id="ping_box_${pSafeId}" class="${pingClass}" data-cached-ts="${cachedTs}">${pingContent}</div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    let lastExitNodesSig = "";
+    function updateExitNodeSelect(peers, activeNode) {
+      const exitNodes = peers.filter(p => p.ExitNodeOption === true);
+      const sig = exitNodes.map(n => `${n.HostName}_${n.Online ? 1 : 0}`).join(';') + '|' + (activeNode || '');
+      if (sig === lastExitNodesSig) return;
+      lastExitNodesSig = sig;
+
+      const triggerText = document.getElementById("exitNodeSelectedText");
+      const optionsList = document.getElementById("exitNodeOptionsList");
+      const sel = document.getElementById("exitNodeSelect");
+
+      if (sel) {
+        sel.innerHTML = '<option value="">-- 选择已发现的 Exit Node (' + exitNodes.length + ' 台可用) --</option>';
+      }
+
+      if (activeNode) {
+        const found = exitNodes.find(n => {
+          const ips = n.TailscaleIPs || [];
+          return ips.includes(activeNode) || n.HostName === activeNode;
+        });
+        if (found) {
+          if (triggerText) triggerText.textContent = `🟢 ${found.HostName} (${activeNode})`;
+        } else if (triggerText) {
+          triggerText.textContent = `🟢 当前出口: ${activeNode}`;
+        }
+      } else {
+        if (triggerText) {
+          triggerText.textContent = exitNodes.length > 0
+            ? `-- 选择已发现的 Exit Node (${exitNodes.length} 台可用) --`
+            : `-- 暂未发现可用的 Exit Node --`;
+        }
+      }
+
+      if (optionsList) {
+        let html = `
+          <div class="custom-option-item ${!activeNode ? 'active' : ''}" onclick="selectCustomExitNode('', '')">
+            <span style="color:var(--text-muted);">⚪ 不使用 Exit Node (直连上网)</span>
+            ${!activeNode ? '<span style="font-size:11px; color:#60a5fa;">✓ 当前</span>' : ''}
+          </div>
+        `;
+
+        exitNodes.forEach(node => {
+          const nodeIps = node.TailscaleIPs || [];
+          const ipv4 = nodeIps.find(ip => ip.includes('.')) || nodeIps[0] || node.HostName;
+          const isOnline = !!node.Online;
+          const isSelected = (activeNode && (activeNode === ipv4 || activeNode === node.HostName));
+
+          if (sel) {
+            const opt = document.createElement("option");
+            opt.value = ipv4;
+            opt.textContent = `${node.HostName} (${ipv4}) ${isOnline ? '🟢 在线' : '⚪ 离线'}`;
+            if (isSelected) opt.selected = true;
+            sel.appendChild(opt);
+          }
+
+          html += `
+            <div class="custom-option-item ${isSelected ? 'active' : ''}" onclick="selectCustomExitNode('${ipv4}', '${escapeHtml(node.HostName)}')">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="dot ${isOnline ? 'online' : 'offline'}"></span>
+                <span style="font-weight:600; color:#fff;">${escapeHtml(node.HostName)}</span>
+                <span style="font-size:11px; color:#94a3b8;">(${ipv4})</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="tag" style="background:${isOnline ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)'}; color:${isOnline ? '#34d399' : 'var(--text-muted)'}; font-size:10px;">${isOnline ? '🟢 在线' : '⚪ 离线'}</span>
+                ${isSelected ? '<span style="font-size:11px; color:#60a5fa;">✓ 当前</span>' : ''}
+              </div>
+            </div>
+          `;
+        });
+
+        optionsList.innerHTML = html;
+      }
+    }
+
+    let isRefreshing = false;
+    async function refreshStatus(isManual = false) {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      try {
+        const raw = await runHelper(isManual ? "status force" : "status", 5000);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        const rawStatus = data.raw_status || {};
+        const selfNode = rawStatus.Self || {};
+
+        const backendState = rawStatus.BackendState || (data.running ? "Running" : "Stopped");
+        const isExpired = !!(selfNode.Expired || (rawStatus.Health && rawStatus.Health.some(h => h && h.toLowerCase().includes("expired"))));
+        const inNetMap = (selfNode.InNetworkMap !== false);
+
+        // 核心判定：只有当 BackendState 为 Running 且凭证未过期、且在网络拓扑中，才判定为真正已连接绑定
+        const isNetworkBound = (backendState === "Running") && !isExpired && inNetMap;
+
+        // 解析双栈 IP 与主机名
+        const ipv4El = document.getElementById("ipv4");
+        const ipv6El = document.getElementById("ipv6");
+        const hostnameEl = document.getElementById("hostname");
+
+        // 设备名称 (Host) 优先级判定：自定义设置 > 设备型号 > 认证型号 > 默认值
+        const customHost = (data.custom_hostname || "").trim();
+        const devModel = (data.device_model || "").trim();
+        const certModel = (data.cert_model || "").trim();
+        const tailHost = (selfNode.HostName || "").trim();
+
+        let displayHost = "";
+        if (customHost) {
+          displayHost = customHost;
+        } else if (devModel) {
+          displayHost = devModel;
+        } else if (certModel) {
+          displayHost = certModel;
+        } else if (tailHost && tailHost !== "localhost") {
+          displayHost = tailHost;
+        } else {
+          displayHost = data.priority_hostname || "Android";
+        }
+
+        if (isNetworkBound) {
+          const ips = selfNode.TailscaleIPs || [];
+          const ipv4 = ips.find(ip => ip.includes('.')) || "—";
+          const ipv6 = ips.find(ip => ip.includes(':')) || "—";
+          ipv4El.textContent = ipv4;
+          ipv4El.style.color = "var(--text)";
+          ipv6El.textContent = ipv6;
+          ipv6El.style.color = "var(--text)";
+          hostnameEl.textContent = displayHost;
+        } else {
+          ipv4El.textContent = "— (未接入网络)";
+          ipv4El.style.color = "var(--text-muted)";
+          ipv6El.textContent = "— (未接入网络)";
+          ipv6El.style.color = "var(--text-muted)";
+          hostnameEl.textContent = data.running ? displayHost : `${displayHost} (未连接)`;
+        }
+        document.getElementById("daemonVersion").textContent = (data.version || "v1.102.4");
+
+        // 核心更新卡片信息更新
+        const updateCoreEl = document.getElementById("updateCoreVer");
+        if (updateCoreEl) updateCoreEl.textContent = `${data.version || "v1.102.4"} (ARM64 Native)`;
+        if (data.auto_update !== undefined) {
+          const autoSw = document.getElementById("autoUpdateSwitch");
+          if (autoSw && !isSettingsBusy) autoSw.checked = (data.auto_update === "true");
+        }
+        if (data.update_interval) {
+          const intSel = document.getElementById("updateIntervalSelect");
+          if (intSel && !isSettingsBusy) intSel.value = data.update_interval;
+          const intervalMap = {
+            "86400": "每天 (24 小时)",
+            "43200": "每 12 小时",
+            "21600": "每 6 小时",
+            "604800": "每周"
+          };
+          const triggerText = document.getElementById("intervalSelectedText");
+          if (triggerText && intervalMap[data.update_interval]) {
+            triggerText.textContent = intervalMap[data.update_interval];
+          }
+          const list = document.getElementById("intervalOptionsList");
+          if (list) {
+            list.querySelectorAll(".custom-option-item").forEach(item => {
+              const isSel = item.getAttribute("data-val") === String(data.update_interval);
+              item.classList.toggle("active", isSel);
+              const span = item.querySelector("span:first-child");
+              if (span) span.style.color = isSel ? "#fff" : "#cbd5e1";
+              const check = item.querySelector(".check-mark");
+              if (check) check.style.display = isSel ? "inline" : "none";
+            });
+          }
+        }
+        if (data.latest_version) {
+          const latEl = document.getElementById("updateLatestVer");
+          if (latEl && latEl.textContent.includes("尚未检测")) {
+            latEl.textContent = data.latest_version.startsWith('v') ? data.latest_version : `v${data.latest_version}`;
+          }
+        }
+
+        if (!isSettingsBusy) {
+          document.getElementById("acceptRoutesSwitch").checked = (data.accept_routes === "true");
+          document.getElementById("acceptDnsSwitch").checked = (data.accept_dns === "true");
+
+          // Allow LAN Access 状态
+          document.getElementById("allowLanSwitch").checked = (data.exit_node_allow_lan !== "false");
+
+          // 自身作为 Exit Node 与 Subnet 节点状态
+          const advExit = (data.advertise_exit_node !== "false");
+          const advRoutes = (data.advertise_routes_enabled !== "false");
+          document.getElementById("advertiseExitSwitch").checked = advExit;
+          document.getElementById("advertiseRoutesSwitch").checked = advRoutes;
+          updateAdvBadges(advExit, advRoutes);
+        }
+
+        const inputRoutes = document.getElementById("advertiseRoutesInput");
+        if (inputRoutes && !inputRoutes.value && data.advertise_routes) {
+          inputRoutes.value = data.advertise_routes;
+        }
+
+        // 借用外部 Exit Node 状态
+        const activeNode = data.exit_node || "";
+        currentActiveExitNode = activeNode;
+        if (activeNode && !document.getElementById("exitNodeInput").value) {
+          document.getElementById("exitNodeInput").value = activeNode;
+        }
+        updateExitNodeStatusUI();
+
+        // 智能渲染设备列表与 Exit Node 下拉框 (必须始终调用，断开时清空列表)
+        if (isNetworkBound && rawStatus.Peer && Object.keys(rawStatus.Peer).length > 0) {
+          renderPeerList(rawStatus, activeNode);
+          updateExitNodeSelect(Object.values(rawStatus.Peer), activeNode);
+        } else {
+          renderPeerList(null, activeNode);
+          updateExitNodeSelect([], activeNode);
+        }
+
+        // 核心状态徽标与详细状态列表恢复我们的版本
+        const badge = document.getElementById("statusBadge");
+        const loginNotice = document.getElementById("loginNotice");
+        const loginCard = document.getElementById("loginCard");
+
+        const stateElem = document.getElementById("backendStateVal");
+        const mainPidElem = document.getElementById("mainPidVal");
+        const pidElem = document.getElementById("pidVal");
+        const tunElem = document.getElementById("tunVal");
+        const serverElem = document.getElementById("serverVal");
+
+        if (mainPidElem) {
+          if (data.running && data.main_pid) {
+            mainPidElem.textContent = data.main_pid;
+            mainPidElem.style.color = "#34d399";
+          } else {
+            mainPidElem.textContent = "--";
+            mainPidElem.style.color = "var(--text-muted)";
+          }
+        }
+
+        if (pidElem) {
+          if (data.running && data.daemon_pid) {
+            pidElem.textContent = data.daemon_pid;
+            pidElem.style.color = "#34d399";
+          } else {
+            pidElem.textContent = "--";
+            pidElem.style.color = "var(--text-muted)";
+          }
+        }
+
+        const badgeStateLead = document.getElementById("badgeStateLead");
+        if (badgeStateLead) {
+          if (isNetworkBound) {
+            badgeStateLead.className = "tech-badge leading green";
+            badgeStateLead.textContent = "ONLINE";
+          } else if (isExpired) {
+            badgeStateLead.className = "tech-badge leading red";
+            badgeStateLead.textContent = "EXPIRED";
+          } else if (backendState === "NeedsLogin" || backendState === "NoState") {
+            badgeStateLead.className = "tech-badge leading amber";
+            badgeStateLead.textContent = "AUTH";
+          } else if (data.running) {
+            badgeStateLead.className = "tech-badge leading blue";
+            badgeStateLead.textContent = "START";
+          } else {
+            badgeStateLead.className = "tech-badge leading gray";
+            badgeStateLead.textContent = "STOP";
+          }
+        }
+
+        if (tunElem) {
+          if (data.running) {
+            const mainIp = (selfNode.TailscaleIPs && selfNode.TailscaleIPs[0]) || "";
+            tunElem.textContent = mainIp ? `tailscale0 (${mainIp})` : "tailscale0 (等待分配 IP)";
+            tunElem.style.color = "#60a5fa";
+          } else {
+            tunElem.textContent = "tailscale0 (未创建)";
+            tunElem.style.color = "var(--text-muted)";
+          }
+        }
+
+        if (serverElem) {
+          const controlUrl = (rawStatus.ControlURL || "").trim();
+          if (!controlUrl || controlUrl.includes("tailscale.com") || controlUrl.includes("@") || controlUrl === "controlplane.tailscale.com") {
+            currentControlUrl = "https://console.tailscale.com/";
+            serverElem.textContent = "Tailscale 官方后台 (controlplane.tailscale.com) ↗";
+          } else {
+            currentControlUrl = controlUrl.startsWith("http") ? controlUrl : `https://${controlUrl}`;
+            const cleanHost = controlUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+            serverElem.textContent = `自建控制后台 (${cleanHost}) ↗`;
+          }
+        }
+
+        if (stateElem) {
+          if (isNetworkBound) {
+            stateElem.style.color = "#34d399";
+            stateElem.innerHTML = "正常连接运行 (Running)";
+          } else if (isExpired) {
+            stateElem.style.color = "#ef4444";
+            stateElem.innerHTML = "凭证已过期 (Expired)";
+          } else if (backendState === "NeedsLogin" || backendState === "NoState") {
+            stateElem.style.color = "#f59e0b";
+            stateElem.innerHTML = '身份认证中 (NeedsLogin)';
+          } else if (backendState === "Starting") {
+            stateElem.style.color = "#f59e0b";
+            stateElem.innerHTML = "正在同步连接 (Starting)";
+          } else if (backendState === "NeedsMachineAuth") {
+            stateElem.style.color = "#f59e0b";
+            stateElem.innerHTML = "等待控制台批准 (NeedsMachineAuth)";
+          } else if (data.running) {
+            stateElem.style.color = "#f59e0b";
+            stateElem.innerHTML = `待连接 (${backendState})`;
+          } else {
+            stateElem.style.color = "var(--text-muted)";
+            stateElem.innerHTML = "未运行 (Stopped)";
+          }
+        }
+
+        if (isNetworkBound) {
+          currentAuthUrl = "";
+          badge.className = "badge green";
+          badge.textContent = "● 运行中 (已连接)";
+          closeLoginUrl();
+          loginNotice.className = "tech-badge green";
+          loginNotice.textContent = "已连接绑定 (Running)";
+          if (loginCard) loginCard.style.borderColor = "var(--card-border)";
+        } else if (isExpired) {
+          badge.className = "badge red";
+          badge.textContent = "● 凭证已过期";
+          loginNotice.className = "tech-badge red";
+          loginNotice.textContent = "凭证已过期，请重新绑定";
+          if (loginCard) loginCard.style.borderColor = "rgba(239, 68, 68, 0.4)";
+          const authUrl = rawStatus.AuthURL || data.auth_url;
+          if (authUrl) {
+            currentAuthUrl = authUrl;
+            showLoginUrl(authUrl);
+          }
+        } else if (backendState === "NeedsLogin" || backendState === "NoState") {
+          badge.className = "badge yellow";
+          badge.textContent = "● 需要认证 (未登录)";
+          loginNotice.className = "tech-badge amber";
+          loginNotice.textContent = "推荐使用 AUTH KEY 秒绑";
+          loginNotice.style.color = "#f59e0b";
+          if (loginCard) loginCard.style.borderColor = "rgba(245, 158, 11, 0.4)";
+          const authUrl = rawStatus.AuthURL || data.auth_url;
+          if (authUrl) {
+            currentAuthUrl = authUrl;
+            showLoginUrl(authUrl);
+          }
+        } else if (backendState === "NeedsMachineAuth") {
+          badge.className = "badge yellow";
+          badge.textContent = "● 等待控制台批准";
+          loginNotice.textContent = "需在 Tailscale 控制台 Approve 此设备";
+          loginNotice.style.color = "#f59e0b";
+        } else if (backendState === "Starting") {
+          badge.className = "badge yellow";
+          badge.textContent = "● 正在同步连接...";
+          loginNotice.textContent = "正在连接 Tailscale 协调服务器...";
+          loginNotice.style.color = "#f59e0b";
+        } else if (backendState === "Stopped") {
+          badge.className = "badge red";
+          badge.textContent = "● 服务已停止";
+          loginNotice.textContent = "Tailscale 核心服务已停止";
+          loginNotice.style.color = "var(--text-muted)";
+        } else if (data.running) {
+          badge.className = "badge yellow";
+          badge.textContent = "● 待连接 (" + backendState + ")";
+          loginNotice.textContent = "后台状态: " + backendState;
+          loginNotice.style.color = "#f59e0b";
+        } else {
+          badge.className = "badge red";
+          badge.textContent = "● 服务已停止";
+          loginNotice.textContent = "未运行";
+          loginNotice.style.color = "var(--text-muted)";
+        }
+
+        if (isManual) {
+          fetchLogs();
+          const desc = isNetworkBound ? "已连接运行" : (isExpired ? "凭证已过期/已解绑" : backendState);
+          showToast("状态已刷新: " + desc);
+        }
+      } catch (e) {
+        console.error("refreshStatus error:", e);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    let currentActiveExitNode = "";
+
+    function updateExitNodeStatusUI() {
+      const statusElem = document.getElementById("exitNodeStatusVal");
+      const clearBtn = document.getElementById("btnExitClear");
+      if (!statusElem) return;
+      if (currentActiveExitNode) {
+        statusElem.textContent = `已生效: ${currentActiveExitNode}`;
+        statusElem.className = "tech-badge green";
+        statusElem.style.background = "";
+        statusElem.style.color = "";
+        statusElem.style.border = "";
+        if (clearBtn) clearBtn.style.display = "inline-block";
+      } else {
+        statusElem.textContent = "未启用 (直连上网)";
+        statusElem.className = "tech-badge gray";
+        statusElem.style.background = "";
+        statusElem.style.color = "";
+        statusElem.style.border = "";
+        if (clearBtn) clearBtn.style.display = "none";
+      }
+    }
+
+    async function applyExitNode() {
+      const node = document.getElementById("exitNodeInput").value.trim();
+      if (!node) return showToast("请先选择或输入 Exit Node 节点");
+      const allowLan = document.getElementById("allowLanSwitch").checked ? "true" : "false";
+      showToast("正在切换 Exit Node 到: " + node);
+      try {
+        await runHelper(`set_exit_node '${node}' '${allowLan}'`);
+        currentActiveExitNode = node;
+        updateExitNodeStatusUI();
+        showToast("Exit Node 已启用");
+        setTimeout(() => refreshStatus(true), 2000);
+      } catch (e) {
+        showToast("设置失败: " + e);
+      }
+    }
+
+    async function disableExitNode() {
+      showToast("正在停用 Exit Node...");
+      try {
+        await runHelper("set_exit_node '' 'true'");
+        currentActiveExitNode = "";
+        document.getElementById("exitNodeInput").value = "";
+        document.getElementById("exitNodeSelect").value = "";
+        const triggerText = document.getElementById("exitNodeSelectedText");
+        if (triggerText) triggerText.textContent = "-- 选择已发现的 Exit Node --";
+        updateExitNodeStatusUI();
+        showToast("Exit Node 已关闭");
+        setTimeout(() => refreshStatus(true), 2000);
+      } catch (e) {
+        showToast("停用失败: " + e);
+      }
+    }
+
+    // 内核检测更新与自动更新管理
+    async function checkUpdate(manual = false) {
+      const latestEl = document.getElementById("updateLatestVer");
+      const doUpdateBtn = document.getElementById("btnDoUpdate");
+      if (latestEl) {
+        latestEl.textContent = "正在检测线上版本...";
+        latestEl.style.color = "var(--text-muted)";
+      }
+      try {
+        const res = await runHelper("check_update", 10000);
+        const json = JSON.parse(res);
+        const current = json.current || "1.102.4";
+        const latest = json.latest || current;
+        if (latestEl) {
+          if (latest !== current) {
+            latestEl.textContent = `v${latest} (发现新版本)`;
+            latestEl.style.color = "#38bdf8";
+            latestEl.style.fontWeight = "600";
+          } else {
+            latestEl.textContent = `v${latest} (已是最新稳定版)`;
+            latestEl.style.color = "#34d399";
+            latestEl.style.fontWeight = "600";
+          }
+        }
+        if (latest !== current) {
+          if (doUpdateBtn) {
+            doUpdateBtn.style.display = "inline-block";
+            doUpdateBtn.textContent = `⚡ 立即更新 (v${latest})`;
+          }
+          if (manual) showToast(`发现新版本 v${latest}！`);
+        } else {
+          if (doUpdateBtn) doUpdateBtn.style.display = "none";
+          if (manual) showToast(`当前核心已是最新版本 (v${current})`);
+        }
+      } catch (e) {
+        if (latestEl) {
+          latestEl.textContent = "检测失败";
+          latestEl.style.color = "#f87171";
+        }
+        if (manual) showToast("检查更新失败: " + e);
+      }
+    }
+
+    async function doUpdateCore() {
+      const ok = await showConfirmDialog("更新内核核心", "确定要下载并更新 Tailscale 核心至最新版本吗？\n\n更新过程将自动下载对应官方稳定版二进制、备份原文件、替换并平滑重启服务。", "立即更新");
+      if (!ok) return;
+      showToast("正在下载并更新核心，请稍候...");
+      try {
+        await runHelper("do_update", 60000);
+        showToast("更新完成，正在重新加载服务状态...");
+        setTimeout(() => refreshStatus(true), 3000);
+      } catch (e) {
+        showToast("更新失败: " + e);
+      }
+    }
+
+    async function onToggleAutoUpdate() {
+      const en = document.getElementById("autoUpdateSwitch").checked ? "true" : "false";
+      const interval = document.getElementById("updateIntervalSelect").value || "86400";
+      showToast(en === "true" ? "已开启后台自动检测更新" : "已关闭自动更新");
+      try {
+        await runHelper(`set_auto_update '${en}' '${interval}'`);
+      } catch (e) {}
+    }
+
+    async function onUpdateIntervalChange() {
+      const en = document.getElementById("autoUpdateSwitch").checked ? "true" : "false";
+      const interval = document.getElementById("updateIntervalSelect").value || "86400";
+      showToast("已更新检测周期");
+      try {
+        await runHelper(`set_auto_update '${en}' '${interval}'`);
+      } catch (e) {}
+    }
+
+    function toggleIntervalDropdown() {
+      const list = document.getElementById("intervalOptionsList");
+      const arrow = document.getElementById("intervalArrow");
+      if (!list) return;
+      const isHidden = list.style.display === "none" || !list.style.display;
+      list.style.display = isHidden ? "block" : "none";
+      if (arrow) arrow.classList.toggle("open", isHidden);
+    }
+
+    function selectIntervalOption(val, text) {
+      const triggerText = document.getElementById("intervalSelectedText");
+      const list = document.getElementById("intervalOptionsList");
+      const arrow = document.getElementById("intervalArrow");
+      const sel = document.getElementById("updateIntervalSelect");
+      if (triggerText) triggerText.textContent = text;
+      if (sel) sel.value = val;
+      if (list) {
+        list.style.display = "none";
+        list.querySelectorAll(".custom-option-item").forEach(item => {
+          const isSel = item.getAttribute("data-val") === val;
+          item.classList.toggle("active", isSel);
+          const span = item.querySelector("span:first-child");
+          if (span) span.style.color = isSel ? "#fff" : "#cbd5e1";
+          const check = item.querySelector(".check-mark");
+          if (check) check.style.display = isSel ? "inline" : "none";
+        });
+      }
+      if (arrow) arrow.classList.remove("open");
+      onUpdateIntervalChange();
+    }
+
+    async function startService() {
+      showToast("正在启动服务...");
+      await runHelper("start");
+      setTimeout(() => refreshStatus(true), 2500);
+    }
+
+    async function stopService() {
+      showToast("正在停止服务...");
+      await runHelper("stop");
+      setTimeout(() => refreshStatus(true), 1500);
+    }
+
+    async function restartService() {
+      showToast("正在重启服务...");
+      await runHelper("restart");
+      setTimeout(() => refreshStatus(true), 3000);
+    }
+
+    async function loginWithKey() {
+      const key = document.getElementById("authKeyInput").value.trim();
+      if (!key) return showToast("请输入 Auth Key");
+      showToast("正在提交密钥登录 (秒级)...");
+      try {
+        await runHelper(`login_key '${key}'`);
+        showToast("登录指令已发送，正在连接...");
+        setTimeout(() => refreshStatus(true), 2500);
+      } catch (e) {
+        showToast("登录失败: " + e);
+      }
+    }
+
+    let currentControlUrl = "https://console.tailscale.com/";
+
+    async function openExternalUrl(url) {
+      if (!url) return;
+      showToast("正在打开链接...");
+      try {
+        if (window.ksu && typeof window.ksu.exec === "function") {
+          await runHelper(`open_url '${url}'`);
+          showToast("已唤起外部浏览器");
+        } else {
+          window.open(url, "_blank");
+        }
+      } catch (e) {
+        try {
+          window.open(url, "_blank");
+        } catch (err) {
+          showToast("打开失败: " + e);
+        }
+      }
+    }
+
+    function openControlPlane() {
+      openExternalUrl("https://console.tailscale.com/");
+    }
+
+    let currentAuthUrl = "";
+    async function getLoginUrl() {
+      if (currentAuthUrl) {
+        showLoginUrl(currentAuthUrl);
+        return;
+      }
+      showToast("正在获取登录链接...");
+      try {
+        const res = await runHelper("login_url", 6000);
+        const json = JSON.parse(res);
+        if (json.url) {
+          currentAuthUrl = json.url;
+          showLoginUrl(json.url);
+          showToast("登录链接已就绪");
+        } else {
+          showToast("正在与服务器握手，请在 2 秒后重试");
+        }
+      } catch (e) {
+        showToast("获取失败: " + e);
+      }
+    }
+
+    function showLoginUrl(url) {
+      currentAuthUrl = url;
+      const modal = document.getElementById("urlModal");
+      if (modal) modal.style.display = "flex";
+      const textElem = document.getElementById("loginUrlText");
+      if (textElem) textElem.textContent = url;
+    }
+
+    function closeLoginUrl() {
+      const modal = document.getElementById("urlModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function openLoginUrl() {
+      const url = currentAuthUrl || (document.getElementById("loginUrlText") ? document.getElementById("loginUrlText").textContent.trim() : "");
+      if (!url || !url.startsWith("http")) {
+        return showToast("请先获取有效的登录链接");
+      }
+      openExternalUrl(url);
+    }
+
+    async function copyLoginUrl() {
+      const textElem = document.getElementById("loginUrlText");
+      const url = currentAuthUrl || (textElem ? textElem.textContent.trim() : "");
+      if (!url || !url.startsWith("http")) {
+        return showToast("暂无有效的登录链接");
+      }
+      const ok = await copyText(url, "已成功复制授权链接！");
+      if (!ok && textElem) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(textElem);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          showToast("已选中链接，请长按复制");
+        } catch (e) {
+          showToast("请长按链接进行复制");
+        }
+      }
+    }
+
+    async function confirmAuthSync() {
+      showToast("正在与 Tailscale 云端对齐并激活通道...");
+      try {
+        await runHelper("sync_auth");
+      } catch (e) {
+        console.error("sync_auth error:", e);
+      }
+      setTimeout(() => refreshStatus(true), 2000);
+    }
+
+    async function resetAuth() {
+      const ok = await showConfirmDialog("解绑账号确认", "确定要解绑当前 Tailscale 账号并重置登录状态吗？\n\n重置后本设备将从 Tailnet 虚拟内网断开，需重新扫描授权或输入密钥重新绑定。", "确定解绑", true);
+      if (!ok) return;
+      showToast("正在解绑重置...");
+      try {
+        await runHelper("logout");
+        showToast("已解绑重置，请重新登录");
+        setTimeout(() => refreshStatus(true), 2000);
+      } catch (e) {
+        showToast("解绑失败: " + e);
+      }
+    }
+
+    let rawLogLines = [];
+    let currentLogLevel = "ALL";
+
+    function isErrorLog(line) {
+      if (!line) return false;
+      return /(\[ERROR\]|level=error|\berror\b|failed|failure|fatal|panic|refused|denied|cannot)/i.test(line);
+    }
+
+    function isWarnLog(line) {
+      if (!line) return false;
+      // 若已属于 Error 则绝不在 Warn 中重复显示，防止包含 warnable 等字段的错误日志混入警告
+      if (isErrorLog(line)) return false;
+      return /(\[WARN\]|level=warn|\bwarn\b|\bwarning\b|dropped|retry|retrying|timed out|rate limit|fallback)/i.test(line);
+    }
+
+    function isInfoLog(line) {
+      if (!line) return false;
+      return !isErrorLog(line) && !isWarnLog(line);
+    }
+
+    function setLogLevel(lvl) {
+      currentLogLevel = lvl;
+      ["All", "Info", "Warn", "Error"].forEach(name => {
+        const el = document.getElementById("filterTab" + name);
+        if (el) el.classList.toggle("active", name.toUpperCase() === lvl);
+      });
+      renderFilteredLogs();
+    }
+
+    function renderFilteredLogs() {
+      const box = document.getElementById("logBox");
+      if (!box) return;
+      if (!rawLogLines || rawLogLines.length === 0) {
+        box.textContent = "暂无日志记录";
+        return;
+      }
+
+      let filtered = [];
+      if (currentLogLevel === "ALL") {
+        filtered = rawLogLines;
+      } else if (currentLogLevel === "ERROR") {
+        filtered = rawLogLines.filter(line => isErrorLog(line));
+      } else if (currentLogLevel === "WARN") {
+        filtered = rawLogLines.filter(line => isWarnLog(line));
+      } else if (currentLogLevel === "INFO") {
+        filtered = rawLogLines.filter(line => isInfoLog(line));
+      }
+
+      if (filtered.length === 0) {
+        box.innerHTML = `<span style="color:var(--text-muted);">[${currentLogLevel}] 筛选级别下暂无匹配日志</span>`;
+      } else {
+        const formatted = filtered.map(line => {
+          const escaped = escapeHtml(line);
+          if (isErrorLog(line)) {
+            return `<span style="color:#f87171;">${escaped}</span>`;
+          } else if (isWarnLog(line)) {
+            return `<span style="color:#fbbf24;">${escaped}</span>`;
+          } else {
+            return `<span style="color:#93c5fd;">${escaped}</span>`;
+          }
+        });
+        box.innerHTML = formatted.join("\n");
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function fetchLogs() {
+      try {
+        const logs = await runHelper("logs");
+        if (logs) {
+          rawLogLines = logs.split("\n").filter(l => l.trim().length > 0);
+        } else {
+          rawLogLines = [];
+        }
+        renderFilteredLogs();
+      } catch (e) {
+        const box = document.getElementById("logBox");
+        if (box) box.textContent = "获取日志失败: " + e;
+      }
+    }
+
+    function getLogLevelChinese(level) {
+      const map = {
+        ALL: "全部日志",
+        INFO: "信息日志",
+        WARN: "警告日志",
+        ERROR: "错误日志"
+      };
+      return map[level] || "全部日志";
+    }
+
+    async function copyLogs() {
+      const logBox = document.getElementById("logBox");
+      const logText = logBox ? (logBox.innerText || logBox.textContent) : "";
+      if (!logText || logText === "暂无日志记录" || logText.startsWith("正在加载") || logText.includes("暂无匹配日志")) {
+        return showToast("暂无有效日志可复制");
+      }
+      const levelName = getLogLevelChinese(currentLogLevel);
+      const ok = await copyText(logText, `已复制当前${levelName}到剪切板`);
+      if (!ok && logBox) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(logBox);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          showToast("已全选日志，请长按复制");
+        } catch (e) {
+          showToast("请长按下方日志进行复制");
+        }
+      }
+    }
+
+    async function clearLogs() {
+      const levelName = getLogLevelChinese(currentLogLevel);
+      if (currentLogLevel === "ALL") {
+        rawLogLines = [];
+        try {
+          await runHelper("clear_logs");
+        } catch (e) {
+          console.warn("clear_logs error:", e);
+        }
+      } else if (currentLogLevel === "ERROR") {
+        rawLogLines = rawLogLines.filter(line => !isErrorLog(line));
+      } else if (currentLogLevel === "WARN") {
+        rawLogLines = rawLogLines.filter(line => !isWarnLog(line));
+      } else if (currentLogLevel === "INFO") {
+        rawLogLines = rawLogLines.filter(line => !isInfoLog(line));
+      }
+      showToast(`已清除当前${levelName}`);
+      renderFilteredLogs();
+    }
+
+    async function changeHostname() {
+      const current = (document.getElementById("hostname").textContent || "").replace(/\s*\(未连接\)/, '').trim();
+      const name = await showPromptDialog("修改设备名称", "请输入新的 Tailscale Machines 设备名称 (支持英文、数字和连字符 -)：", (current === "—" || !current) ? "" : current);
+      if (name === null) return;
+      const trimmed = name.trim();
+      if (!trimmed) return showToast("名称不能为空");
+      showToast("正在更新 Machines 设备名称...");
+      try {
+        await runHelper(`set_hostname '${trimmed}'`);
+        showToast("Machines 设备名称已更新！");
+        setTimeout(() => refreshStatus(true), 1500);
+      } catch (e) {
+        showToast("更新失败: " + e);
+      }
+    }
+
+    const pingResultsCache = {};
+    const activePings = new Set();
+
+    const DERP_REGIONS = {
+      1: "纽约 (NYC)",
+      2: "旧金山 (SFO)",
+      3: "新加坡 (Singapore)",
+      4: "法兰克福 (Frankfurt)",
+      5: "悉尼 (Sydney)",
+      6: "班加罗尔 (Bangalore)",
+      7: "东京 (Tokyo)",
+      8: "伦敦 (London)",
+      9: "达拉斯 (Dallas)",
+      10: "西雅图 (Seattle)",
+      11: "圣保罗 (São Paulo)",
+      12: "芝加哥 (Chicago)",
+      13: "火奴鲁鲁 (Honolulu)",
+      14: "阿姆斯特丹 (Amsterdam)",
+      15: "约翰内斯堡 (Johannesburg)",
+      16: "迈阿密 (Miami)",
+      17: "多伦多 (Toronto)",
+      18: "巴黎 (Paris)",
+      19: "首尔 (Seoul)",
+      20: "圣地亚哥 (Santiago)",
+      21: "东京-2 (Tokyo 2)",
+      22: "马德里 (Madrid)",
+      23: "香港 (Hong Kong)",
+      24: "台北 (Taipei)",
+      25: "迪拜 (Dubai)",
+      tokyo: "东京 (Tokyo)",
+      tyo: "东京 (Tokyo)",
+      nrt: "东京 (Tokyo)",
+      hkg: "香港 (Hong Kong)",
+      sin: "新加坡 (Singapore)",
+      syd: "悉尼 (Sydney)",
+      tpe: "台北 (Taipei)",
+      sel: "首尔 (Seoul)",
+      sfo: "旧金山 (SFO)",
+      nyc: "纽约 (NYC)",
+      lax: "洛杉矶 (LAX)",
+      chi: "芝加哥 (Chicago)",
+      ord: "芝加哥 (Chicago)",
+      sea: "西雅图 (Seattle)",
+      dfw: "达拉斯 (Dallas)",
+      den: "丹佛 (Denver)",
+      atl: "亚特兰大 (Atlanta)",
+      mia: "迈阿密 (Miami)",
+      fra: "法兰克福 (Frankfurt)",
+      lon: "伦敦 (London)",
+      ams: "阿姆斯特丹 (Amsterdam)",
+      par: "巴黎 (Paris)",
+      mad: "马德里 (Madrid)",
+      waw: "华沙 (Warsaw)",
+      tor: "多伦多 (Toronto)",
+      yul: "蒙特利尔 (Montreal)",
+      blr: "班加罗尔 (Bangalore)",
+      sao: "圣保罗 (São Paulo)",
+      jnb: "约翰内斯堡 (Johannesburg)",
+      shanghai: "上海 (Shanghai)",
+      sha: "上海 (Shanghai)",
+      beijing: "北京 (Beijing)",
+      pek: "北京 (Beijing)",
+      guangzhou: "广州 (Guangzhou)",
+      can: "广州 (Guangzhou)",
+      shenzhen: "深圳 (Shenzhen)"
+    };
+
+    function formatPingResult(raw, target) {
+      if (!raw || !raw.trim()) {
+        const safeTarget = escapeHtml(target || "未知节点");
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: `🔴 探测超时 (无响应)\n• 目标节点: ${target || "未知"}\n• 故障排查: 目标设备未在 3 秒内响应探测报文`,
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测超时 (无响应)</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${safeTarget}</span></div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-fail">超时 (超过 3000ms)</span></div>
+            <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">目标设备未在 3 秒内响应探测报文</span></div>
+            <div class="ping-line"><span class="ping-label">• 可能原因:</span><span class="ping-desc">设备可能离线、息屏休眠或网络防火墙拦截探测</span></div>
+          `
+        };
+      }
+      const clean = raw.trim();
+
+      if (clean.includes("Tailscale 未运行")) {
+        const safeTarget = escapeHtml(target || "未知节点");
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: "🔴 探测失败: Tailscale 核心服务未运行，请先启动服务",
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测失败 (核心未运行)</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${safeTarget}</span></div>
+            <div class="ping-line"><span class="ping-label">• 失败原因:</span><span class="ping-val" style="color:#fca5a5;">Tailscale 核心服务未运行</span></div>
+            <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">请在上方「服务与守护进程」中启动或重启服务</span></div>
+            <div class="ping-line"><span class="ping-label">• 建议操作:</span><span class="ping-desc">核心服务正常运行并连接成功后方可发起 Ping</span></div>
+          `
+        };
+      }
+      if (clean.includes("未指定目标节点")) {
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: "🔴 探测失败: 未指定目标节点",
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测失败</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">未指定</span></div>
+            <div class="ping-line"><span class="ping-label">• 失败原因:</span><span class="ping-val" style="color:#fca5a5;">未指定探测的目标 IP 或主机名</span></div>
+            <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">请从设备列表中选择具备有效 IP 的对端节点</span></div>
+            <div class="ping-line"><span class="ping-label">• 建议操作:</span><span class="ping-desc">检查对端设备的 Tailscale IP 是否已分配</span></div>
+          `
+        };
+      }
+
+      const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+
+      // 优先寻找 Direct P2P 或 peerAPI 或 DERP pong 记录
+      let directMatch = null;
+      let derpMatch = null;
+      let peerApiMatch = null;
+
+      for (const line of lines) {
+        const m = line.match(/pong from\s+([^\s(]+)(?:\s*\(([^)]+)\))?\s+via\s+(\S+)\s+in\s+([0-9.]+(?:ms|s|µs|us))/i);
+        if (m) {
+          const host = m[1];
+          const ip = m[2] || "";
+          const via = m[3];
+          const lat = m[4];
+          const nodeDesc = ip ? `${host} (${ip})` : host;
+
+          if (via.toLowerCase() === "peerapi") {
+            peerApiMatch = { host, ip, via, latency: lat, nodeDesc };
+          } else if (via.toLowerCase().includes("derp")) {
+            derpMatch = { host, ip, via, latency: lat, nodeDesc };
+          } else {
+            directMatch = { host, ip, via, latency: lat, nodeDesc };
+            break;
+          }
+        }
+      }
+
+      if (directMatch) {
+        return {
+          ok: true,
+          state: "ok",
+          latency: directMatch.latency,
+          text: `⚡ P2P 直连通道 (无需经过中继)\n• 往返延迟: ${directMatch.latency}\n• 目标端点: ${directMatch.via}\n• 目标节点: ${directMatch.nodeDesc}`,
+          html: `
+            <div class="ping-title ok">
+              <span class="tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700;">⚡ P2P 直连通道</span>
+              <span class="ping-val mono lat-ok" style="margin-left:auto; font-size:11px;">${escapeHtml(directMatch.latency)}</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-ok">${escapeHtml(directMatch.latency)} (端对端直连)</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标端点:</span><span class="ping-val mono">${escapeHtml(directMatch.via)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(directMatch.nodeDesc)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">双方已建立 P2P 直连通道，流量无需经过 DERP 中继</span></div>
+          `
+        };
+      }
+
+      if (derpMatch) {
+        const dSub = derpMatch.via.match(/DERP\(([^)]+)\)/i);
+        const regionKey = dSub ? dSub[1].toLowerCase() : "";
+        const regionName = DERP_REGIONS[regionKey] || (dSub ? `DERP-${dSub[1]}` : derpMatch.via);
+        return {
+          ok: true,
+          state: "warn",
+          latency: derpMatch.latency,
+          text: `🟡 探测成功 (中继转发通道)\n• 往返延迟: ${derpMatch.latency}\n• 连接模式: Tailscale ${regionName} 中继节点\n• 目标节点: ${derpMatch.nodeDesc}\n• 状态说明: 双方暂未建立 P2P 直连，正借道官方中继中转`,
+          html: `
+            <div class="ping-title warn">
+              <span class="tag" style="background:rgba(245,158,11,0.2); color:#fbbf24; font-weight:700;">🟡 中继转发通道</span>
+              <span class="ping-val mono lat-warn" style="margin-left:auto; font-size:11px;">${escapeHtml(derpMatch.latency)}</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-warn">${escapeHtml(derpMatch.latency)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 连接模式:</span><span class="ping-val">Tailscale ${escapeHtml(regionName)} 中继节点</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(derpMatch.nodeDesc)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">双方暂未建立 P2P 直连，当前正借道官方中继中转</span></div>
+          `
+        };
+      }
+
+      if (peerApiMatch) {
+        return {
+          ok: true,
+          state: "ok",
+          latency: peerApiMatch.latency,
+          text: `🟢 探测成功 (PeerAPI 通道)\n• 往返延迟: ${peerApiMatch.latency}\n• 连接模式: Tailscale 内部通道 (PeerAPI 直通)\n• 目标节点: ${peerApiMatch.nodeDesc}`,
+          html: `
+            <div class="ping-title ok">
+              <span class="tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700;">🟢 PeerAPI 通道</span>
+              <span class="ping-val mono lat-ok" style="margin-left:auto; font-size:11px;">${escapeHtml(peerApiMatch.latency)}</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-ok">${escapeHtml(peerApiMatch.latency)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 连接模式:</span><span class="ping-val">Tailscale 内部通道 (PeerAPI 直通)</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(peerApiMatch.nodeDesc)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">通过 Tailscale PeerAPI 内部端口直通响应</span></div>
+          `
+        };
+      }
+
+      // 超时处理
+      if (clean.includes("timed out") || clean.includes("timeout") || clean.includes("time out") || clean.includes("no reply")) {
+        const toMatch = clean.match(/(?:timed out waiting for pong from|time out waiting for pong from|pong from)\s+([^\s(]+)(?:\s*\(([^)]+)\))?/i);
+        const targetDesc = toMatch ? (toMatch[2] ? `${toMatch[1]} (${toMatch[2]})` : toMatch[1]) : (target || "目标设备");
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: `🔴 探测超时 (无响应)\n• 目标节点: ${targetDesc}\n• 故障排查:\n  1. 若刚刚切换或关闭过 Exit Node，节点间正重新协商链路，请稍等 2 秒重试\n  2. 目标设备可能已息屏休眠、离线或网络防火墙屏蔽了 UDP 打洞报文`,
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测超时 (无响应)</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(targetDesc)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-fail">超时 (超过 3000ms)</span></div>
+            <div class="ping-line"><span class="ping-label">• 排查建议:</span><span class="ping-desc">若刚切换/关闭出口节点，链路正重新协商，请重试</span></div>
+            <div class="ping-line"><span class="ping-label">• 可能原因:</span><span class="ping-desc">目标可能已息屏休眠、离线或网络防火墙拦截探测</span></div>
+          `
+        };
+      }
+
+      // 系统 ICMP Ping 回显兜底解析
+      const rttMatch = clean.match(/(?:rtt|round-trip)\s+(?:min\/avg\/max[^\s]*)\s*=\s*[0-9.]+\/([0-9.]+)\/[0-9.]+/i);
+      if (rttMatch) {
+        const latency = parseFloat(rttMatch[1]).toFixed(1) + "ms";
+        return {
+          ok: true,
+          state: "ok",
+          latency: latency,
+          text: `🟢 ICMP Ping 成功\n• 往返延迟: ${latency}\n• 连接模式: 系统底层网络 ICMP 回显\n• 目标地址: ${target || "目标节点"}`,
+          html: `
+            <div class="ping-title ok">
+              <span class="tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700;">🟢 ICMP Ping 成功</span>
+              <span class="ping-val mono lat-ok" style="margin-left:auto; font-size:11px;">${escapeHtml(latency)}</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-ok">${escapeHtml(latency)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 连接模式:</span><span class="ping-val">系统底层网络 ICMP 回显响应</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标地址:</span><span class="ping-val mono">${escapeHtml(target || "目标节点")}</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">已成功接收底层 ICMP 回显应答报文</span></div>
+          `
+        };
+      }
+      if (clean.includes("100% packet loss") || clean.includes("100% loss")) {
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: `🔴 ICMP 探测超时 (100% 丢包)\n• 目标地址: ${target || "目标节点"}\n• 状态说明: 目标未响应 ICMP 请求，可能处于离线或开启了禁 Ping`,
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 ICMP 探测超时</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标地址:</span><span class="ping-val mono">${escapeHtml(target || "目标节点")}</span></div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-fail">100% 丢包</span></div>
+            <div class="ping-line"><span class="ping-label">• 排查建议:</span><span class="ping-desc">目标未响应 ICMP 请求，可能处于离线或开启了禁 Ping</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">无法通过底层 ICMP 报文抵达该对端节点</span></div>
+          `
+        };
+      }
+
+      // 通用兜底
+      if (clean.includes("pong")) {
+        const latMatch = clean.match(/in\s+([0-9.]+(?:ms|s|µs|us))/i);
+        const lat = latMatch ? latMatch[1] : "";
+        return {
+          ok: true,
+          state: "ok",
+          latency: lat,
+          text: `🟢 探测响应成功\n• 往返延迟: ${lat || "正常"}\n• 返回报文: ${clean}`,
+          html: `
+            <div class="ping-title ok">
+              <span class="tag" style="background:rgba(16,185,129,0.2); color:#34d399; font-weight:700;">🟢 探测响应成功</span>
+              ${lat ? `<span class="ping-val mono lat-ok" style="margin-left:auto; font-size:11px;">${escapeHtml(lat)}</span>` : ''}
+            </div>
+            <div class="ping-line"><span class="ping-label">• 往返延迟:</span><span class="ping-val mono lat-ok">${escapeHtml(lat || "正常")}</span></div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(target || "目标节点")}</span></div>
+            <div class="ping-line"><span class="ping-label">• 返回报文:</span><span class="ping-desc">${escapeHtml(clean)}</span></div>
+            <div class="ping-line"><span class="ping-label">• 链路说明:</span><span class="ping-desc">成功接收对端探测响应报文</span></div>
+          `
+        };
+      }
+
+      if (clean.toLowerCase().includes("not found") || clean.toLowerCase().includes("no such host")) {
+        return {
+          ok: false,
+          state: "fail",
+          latency: "",
+          text: `🔴 探测失败: Tailscale 网络中未找到该节点 (${target})`,
+          html: `
+            <div class="ping-title fail">
+              <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测失败 (节点未找到)</span>
+            </div>
+            <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(target || "未知")}</span></div>
+            <div class="ping-line"><span class="ping-label">• 失败原因:</span><span class="ping-val" style="color:#fca5a5;">Tailscale 网络中未找到该节点</span></div>
+            <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">该设备可能已在控制台注销或从网络中解绑</span></div>
+            <div class="ping-line"><span class="ping-label">• 建议操作:</span><span class="ping-desc">请刷新设备列表或在控制台确认该设备状态</span></div>
+          `
+        };
+      }
+
+      return {
+        ok: false,
+        state: "fail",
+        latency: "",
+        text: `🔴 探测未成功\n• 详情: ${clean}`,
+        html: `
+          <div class="ping-title fail">
+            <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测未成功</span>
+          </div>
+          <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(target || "未知")}</span></div>
+          <div class="ping-line"><span class="ping-label">• 返回详情:</span><span class="ping-desc">${escapeHtml(clean)}</span></div>
+          <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">请检查双方网络连通性及防火墙 UDP 策略</span></div>
+          <div class="ping-line"><span class="ping-label">• 建议操作:</span><span class="ping-desc">稍后重试或尝试向其他节点发起探测</span></div>
+        `
+      };
+    }
+
+    async function pingPeer(target, safeId) {
+      if (!target || target === '—') return showToast("无效的目标节点");
+      if (activePings.has(safeId)) return showToast("该节点正在探测中，请稍候...");
+      activePings.add(safeId);
+      const btn = document.getElementById("btn_ping_" + safeId);
+      const box = document.getElementById("ping_box_" + safeId);
+      if (btn) btn.textContent = "⏳ 探测中...";
+      if (box) {
+        box.className = "ping-result-box";
+        box.innerHTML = `
+          <div class="ping-title idle">
+            <span class="tag" style="background:rgba(59,130,246,0.2); color:#60a5fa; font-weight:600;">⏳ 正在探测连通性...</span>
+          </div>
+          <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(target)}</span></div>
+          <div class="ping-line"><span class="ping-label">• 探测状态:</span><span class="ping-desc">正在向节点发送探针，测量往返延迟与直连通道</span></div>
+          <div class="ping-line"><span class="ping-label">• 链路协商:</span><span class="ping-desc">正在检测 P2P 直连打洞与 DERP 中继连通性</span></div>
+          <div class="ping-line"><span class="ping-label">• 提示信息:</span><span class="ping-desc">通常在 1~3 秒内完成探测，请稍候</span></div>
+        `;
+      }
+      showToast("正在向 " + target + " 发起 Ping 探测...");
+      try {
+        const res = await runHelper(`ping '${target}'`, 15000);
+        const formatted = formatPingResult(res, target);
+        const now = Date.now();
+        pingResultsCache[safeId] = {
+          text: formatted.text,
+          html: formatted.html,
+          ok: formatted.ok,
+          state: formatted.state,
+          latency: formatted.latency,
+          timestamp: now
+        };
+        const curBox = document.getElementById("ping_box_" + safeId);
+        if (curBox) {
+          curBox.className = "ping-result-box " + formatted.state;
+          curBox.innerHTML = formatted.html;
+          curBox.setAttribute("data-cached-ts", String(now));
+        }
+        if (formatted.ok) {
+          const latStr = formatted.latency ? ` 延迟: ${formatted.latency}` : "";
+          showToast(`⚡ ${target} 响应成功!${latStr}`);
+        } else {
+          showToast(`⚠️ ${target} 探测超时或无响应`);
+        }
+      } catch (e) {
+        const errText = `🔴 探测发生异常\n• 原因: ${e.message || e}`;
+        const errHtml = `
+          <div class="ping-title fail">
+            <span class="tag" style="background:rgba(239,68,68,0.2); color:#f87171; font-weight:700;">🔴 探测发生异常</span>
+          </div>
+          <div class="ping-line"><span class="ping-label">• 目标节点:</span><span class="ping-val mono">${escapeHtml(target)}</span></div>
+          <div class="ping-line"><span class="ping-label">• 异常原因:</span><span class="ping-val" style="color:#fca5a5;">${escapeHtml(e.message || e)}</span></div>
+          <div class="ping-line"><span class="ping-label">• 故障排查:</span><span class="ping-desc">执行测速命令时返回错误，请检查核心模块状态</span></div>
+          <div class="ping-line"><span class="ping-label">• 建议操作:</span><span class="ping-desc">可尝试在服务管理中重启 Tailscale 后重试</span></div>
+        `;
+        const now = Date.now();
+        pingResultsCache[safeId] = {
+          text: errText,
+          html: errHtml,
+          ok: false,
+          state: "fail",
+          latency: "",
+          timestamp: now
+        };
+        const curBox = document.getElementById("ping_box_" + safeId);
+        if (curBox) {
+          curBox.className = "ping-result-box fail";
+          curBox.innerHTML = errHtml;
+          curBox.setAttribute("data-cached-ts", String(now));
+        }
+        showToast("Ping 失败: " + (e.message || e));
+      } finally {
+        activePings.delete(safeId);
+        const curBtn = document.getElementById("btn_ping_" + safeId);
+        if (curBtn) curBtn.textContent = "⚡ Ping 测速";
+      }
+    }
+
+    // 定时轮询与后台挂起优化
+    let pollTimer = null;
+    const POLL_INTERVAL = 5000;
+
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          refreshStatus();
+        }
+      }, POLL_INTERVAL);
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshStatus();
+        fetchLogs();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    });
+
+    // 初始启动
+    const urlModal = document.getElementById("urlModal");
+    if (urlModal) {
+      urlModal.addEventListener("click", (e) => {
+        if (e.target === urlModal) closeLoginUrl();
+      });
+    }
+    refreshStatus();
+    fetchLogs();
+    startPolling();
+  </script>
+</body>
+</html>
