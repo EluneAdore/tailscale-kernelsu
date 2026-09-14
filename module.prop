@@ -3,6 +3,6 @@ name=Tailscale Native
 version=v1.102.4
 versionCode=11024
 author=Antigravity
-description=KernelSU 原生内核模式 Tailscale 客户端，无需 VPN 插槽，集成 WebUI 统一管理与 Exit Node / Subnet 路由广播。
+description=KernelSU 原生内核模式 Tailscale，极致免维护设计：开机自启、看门狗故障自愈、静默自动更新内核，零 VPN 槽占用，集成现代暗黑 WebUI。
 web=true
 
